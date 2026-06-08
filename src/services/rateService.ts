@@ -371,3 +371,100 @@ export async function fetchSeriesHistory(
     .map((r) => ({ date: r.date as string, value: toNumber(r[series]) }))
     .filter((e) => e.value > 0);
 }
+
+// --- Búsqueda de tasa por fecha (calendario) ---
+
+export interface DateRates {
+  /** Fecha solicitada (YYYY-MM-DD). */
+  requestedDate: string;
+  /** Fecha BCV efectiva (<= solicitada); null si no hay datos. */
+  bcvDate: string | null;
+  usd: number;
+  eur: number;
+  usdChange: number;
+  eurChange: number;
+  /** Promedio USDT de ese día (en hora de Venezuela), o null si no hay datos. */
+  parallel: number | null;
+  /** true si la fecha BCV coincide exactamente con la solicitada. */
+  isExact: boolean;
+}
+
+/**
+ * Tasas vigentes en una fecha histórica dada (buscador de calendario).
+ * El BCV no publica fines de semana/feriados: se devuelve la última tasa
+ * con fecha <= la solicitada. El paralelo se promedia para ese día (VET).
+ */
+export async function fetchRatesByDate(dateISO: string): Promise<DateRates> {
+  // BCV: fila vigente = la más reciente con date <= fecha solicitada (+ anterior para variación).
+  const bcvPromise = supabase
+    .from('bcv_rates_history')
+    .select('date, usd, eur')
+    .lte('date', dateISO)
+    .order('date', { ascending: false })
+    .limit(2);
+
+  // P2P: ventana del día solicitado en hora de Venezuela (UTC-4 → medianoche VET = 04:00 UTC).
+  const startUTC = `${dateISO}T04:00:00.000Z`;
+  const [y, m, d] = dateISO.split('-').map((n) => parseInt(n, 10));
+  const nextDay = new Date(Date.UTC(y, m - 1, d + 1));
+  const nextISO = nextDay.toISOString().split('T')[0];
+  const endUTC = `${nextISO}T04:00:00.000Z`;
+
+  const p2pPromise = supabase
+    .from('p2p_rate_history')
+    .select('price')
+    .gte('created_at', startUTC)
+    .lt('created_at', endUTC)
+    .limit(3000);
+
+  const [bcvResult, p2pResult] = await Promise.allSettled([bcvPromise, p2pPromise]);
+
+  let usd = 0;
+  let eur = 0;
+  let bcvDate: string | null = null;
+  let usdChange = 0;
+  let eurChange = 0;
+
+  if (bcvResult.status === 'fulfilled' && bcvResult.value.data && !bcvResult.value.error) {
+    const rows = bcvResult.value.data as Array<{
+      date: string;
+      usd: number | string;
+      eur: number | string;
+    }>;
+    if (rows.length > 0) {
+      usd = toNumber(rows[0].usd);
+      eur = toNumber(rows[0].eur);
+      bcvDate = rows[0].date;
+      if (rows.length > 1) {
+        usdChange = calculateChange(usd, toNumber(rows[1].usd));
+        eurChange = calculateChange(eur, toNumber(rows[1].eur));
+      }
+    }
+  }
+
+  let parallel: number | null = null;
+  if (p2pResult.status === 'fulfilled' && p2pResult.value.data && !p2pResult.value.error) {
+    const rows = p2pResult.value.data as Array<{ price: number | string }>;
+    let sum = 0;
+    let count = 0;
+    for (const r of rows) {
+      const p = toNumber(r.price);
+      if (p > 0) {
+        sum += p;
+        count += 1;
+      }
+    }
+    if (count > 0) parallel = sum / count;
+  }
+
+  return {
+    requestedDate: dateISO,
+    bcvDate,
+    usd,
+    eur,
+    usdChange,
+    eurChange,
+    parallel,
+    isExact: bcvDate === dateISO,
+  };
+}

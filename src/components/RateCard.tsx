@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { FakeCurrencyInput } from 'react-native-currency-input';
 import {
@@ -13,25 +13,24 @@ import {
 } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { formatChange, formatCurrency } from '../utils/formatting';
+import { PaymentSelectionModal } from './PaymentSelectionModal';
+import { type PaymentMethod } from '../constants/banks';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 type Source = 'foreign' | 'bs';
 
 interface RateCardProps {
   label: string;
-  /** Sigla, p. ej. "USD", "EUR", "USDT". */
   code: string;
-  /** Tasa en Bs por unidad de la divisa. */
   value: number;
   change: number;
-  /** Color de acento de marca. */
   accent: string;
   icon: IconComponent;
   update: string;
   expanded: boolean;
   onToggle: () => void;
-  /** Se llama cuando el usuario enfoca un campo de la calculadora (para centrar la tarjeta). */
   onCalcFocus?: () => void;
+  paymentMethods: PaymentMethod[];
 }
 
 export function RateCard({
@@ -45,11 +44,11 @@ export function RateCard({
   expanded,
   onToggle,
   onCalcFocus,
+  paymentMethods,
 }: RateCardProps) {
   const anim = useRef(new Animated.Value(0)).current;
   const [contentHeight, setContentHeight] = useState(0);
 
-  // Despliegue suave (spring). El teclado NO se abre solo: solo al tocar un campo.
   useEffect(() => {
     Animated.spring(anim, {
       toValue: expanded ? 1 : 0,
@@ -59,7 +58,6 @@ export function RateCard({
     }).start();
   }, [expanded, anim]);
 
-  // Interpolaciones memorizadas: estables entre re-renders.
   const height = useMemo(
     () => anim.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] }),
     [anim, contentHeight],
@@ -73,16 +71,18 @@ export function RateCard({
   const changeColor = isUp ? COLORS.positive : COLORS.negative;
   const ChangeArrow = isUp ? ArrowUpRight : ArrowDownRight;
 
-  // --- Calculadora de dos campos (divisa arriba, Bs abajo) ---
-  // `amount` es el valor del campo activo (`source`); el otro se calcula.
   const [amount, setAmount] = useState<number | null>(1);
   const [source, setSource] = useState<Source>('foreign');
+  // `touched` distingue el valor por defecto (1,00) de un monto ya escrito por el usuario.
+  const [touched, setTouched] = useState(false);
 
-  // Al abrir la tarjeta, la calculadora arranca en 1,00 de la divisa.
   useEffect(() => {
     if (expanded) {
       setSource('foreign');
       setAmount(1);
+      setTouched(false);
+    } else {
+      Keyboard.dismiss();
     }
   }, [expanded]);
 
@@ -90,18 +90,18 @@ export function RateCard({
     source === 'foreign' ? amount : amount != null && value > 0 ? amount / value : null;
   const bsValue = source === 'bs' ? amount : amount != null ? amount * value : null;
 
+  // Al enfocar: si aún es el valor por defecto, se limpia para escribir directo.
+  // Si ya hay un monto escrito, se conserva (solo cambia el campo activo).
   const focusForeign = () => {
-    if (source !== 'foreign') {
-      setSource('foreign');
-      setAmount(foreignValue);
-    }
+    setSource('foreign');
+    if (!touched) setAmount(null);
+    else if (source !== 'foreign') setAmount(foreignValue);
     onCalcFocus?.();
   };
   const focusBs = () => {
-    if (source !== 'bs') {
-      setSource('bs');
-      setAmount(bsValue);
-    }
+    setSource('bs');
+    if (!touched) setAmount(null);
+    else if (source !== 'bs') setAmount(bsValue);
     onCalcFocus?.();
   };
 
@@ -116,19 +116,65 @@ export function RateCard({
   const reset = () => {
     setSource('foreign');
     setAmount(1);
+    setTouched(false);
   };
 
-  const share = async () => {
-    const message =
-      amount != null
-        ? `${label} (${code})\n${formatCurrency(foreignValue ?? 0)} ${code} = Bs ${formatCurrency(bsValue ?? 0)}\n(1 ${code} = Bs ${formatCurrency(value)})\n— vía Kuanto`
-        : `${label}: 1 ${code} = Bs ${formatCurrency(value)}\n— vía Kuanto`;
+  const [selectionModalVisible, setSelectionModalVisible] = useState(false);
+  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (pendingMethod !== undefined && !selectionModalVisible) {
+      const method = pendingMethod;
+      setPendingMethod(undefined);
+      const t = setTimeout(() => performShare(method), 500);
+      return () => clearTimeout(t);
+    }
+  }, [selectionModalVisible, pendingMethod]);
+
+  const share = () => {
+    if (paymentMethods.length > 0) {
+      setSelectionModalVisible(true);
+    } else {
+      performShare(null);
+    }
+  };
+
+  const performShare = async (method: PaymentMethod | null) => {
+    let message = '';
+    if (amount != null) {
+      const currencyName = code === 'parallel' ? 'USDT' : code;
+      const currencyIcon = code === 'EUR' ? '🇪🇺' : currencyName === 'USDT' ? '🪙' : '🇺🇸';
+
+      message = `💱 *Kuanto*\n\n${currencyIcon} *${formatCurrency(foreignValue ?? 0)} ${currencyName}*  ➡️  🇻🇪 *${formatCurrency(bsValue ?? 0)} Bs*\n\n📊 Tasa: *${formatCurrency(value)} Bs*\n📅 ${update}`;
+
+      if (method) {
+        const bankDisplay = `${method.bankName} (${method.bankCode})`;
+        const contactInfo =
+          method.type === 'pago_movil' ? method.phoneNumber || '' : method.accountNumber || '';
+        message += `\n\n*DATOS DE PAGO*`;
+        message += `\n*--------------------*`;
+        message += `\n${bankDisplay}`;
+        message += `\n${method.idPrefix}-${method.holderId}`;
+        message += `\n${contactInfo}`;
+      }
+
+      message += `\n\n_Enviado desde kuanto.online_ 📲`;
+    } else {
+      message =
+        `💱 *Kuanto*\n\n📊 *${label} (${code})*\n💰 *${formatCurrency(value)} Bs*` +
+        (change !== 0 ? ` (${change > 0 ? '+' : ''}${formatChange(change)})` : '') +
+        `\n📅 ${update}\n\n_Enviado desde kuanto.online_ 📲`;
+    }
+
     try {
       await Share.share({ message });
     } catch {
-      /* el usuario canceló */
+      /* usuario canceló */
     }
   };
+
+  // "TASA BCV (USD)" / "TASA BCV (EUR)" / "PROMEDIO (USDT)"
+  const headerLabel = `${label.toUpperCase()} (${code})`;
 
   return (
     <View
@@ -136,46 +182,61 @@ export function RateCard({
         styles.card,
         expanded
           ? {
-              borderColor: accent + '66',
+              borderColor: accent + '55',
               shadowColor: accent,
-              shadowOpacity: 0.3,
-              shadowRadius: 16,
+              shadowOpacity: 0.22,
+              shadowRadius: 18,
               shadowOffset: { width: 0, height: 0 },
               elevation: 10,
             }
-          : { borderColor: accent + '26' },
+          : { borderColor: accent + '22' },
       ]}
     >
       <Pressable
         onPress={onToggle}
-        style={({ pressed }) => (pressed ? styles.headerPressed : null)}
+        style={({ pressed }) => (pressed ? styles.cardPressed : null)}
       >
-        <View style={styles.header}>
+        {/* Top row: icon | label | change badge | share */}
+        <View style={styles.topRow}>
           <View style={[styles.iconWrap, { backgroundColor: accent + '1F' }]}>
-            <Icon size={22} color={accent} />
+            <Icon size={20} color={accent} />
           </View>
-          <View style={styles.titleWrap}>
-            <Text style={styles.label}>{label}</Text>
-            <Text style={styles.code}>{code}</Text>
+          <Text style={styles.cardLabel}>{headerLabel}</Text>
+          <View style={styles.topRight}>
+            {change !== 0 && (
+              <View
+                style={[
+                  styles.changeBadge,
+                  { backgroundColor: changeColor + '1F', borderColor: changeColor + '33' },
+                ]}
+              >
+                <ChangeArrow size={11} color={changeColor} />
+                <Text style={[styles.changeText, { color: changeColor }]}>
+                  {formatChange(change)}
+                </Text>
+              </View>
+            )}
+            {!expanded && (
+              <Pressable onPress={share} hitSlop={10} style={styles.shareBtn}>
+                <Share2 size={17} color={COLORS.textSecondary} />
+              </Pressable>
+            )}
           </View>
-          {change !== 0 && (
-            <View style={[styles.changeBadge, { backgroundColor: changeColor + '1F' }]}>
-              <ChangeArrow size={13} color={changeColor} />
-              <Text style={[styles.changeText, { color: changeColor }]}>
-                {formatChange(change)}
-              </Text>
-            </View>
-          )}
-          <Animated.View style={[styles.chevron, { transform: [{ rotate }] }]}>
-            <ChevronDown size={20} color={COLORS.textSecondary} />
-          </Animated.View>
         </View>
 
+        {/* Value */}
         <View style={styles.valueRow}>
-          <Text style={styles.currencySymbol}>Bs</Text>
-          <Text style={styles.value}>{formatCurrency(value)}</Text>
+          <Text style={[styles.value, { color: accent }]}>{formatCurrency(value)}</Text>
+          <Text style={[styles.bsSuffix, { color: accent }]}>Bs.</Text>
         </View>
-        <Text style={styles.update}>Actualizado: {update}</Text>
+
+        {/* Update + chevron */}
+        <View style={styles.updateRow}>
+          <Text style={styles.update}>Actualizado: {update}</Text>
+          <Animated.View style={{ transform: [{ rotate }], opacity: 0.45 }}>
+            <ChevronDown size={14} color={COLORS.textSecondary} />
+          </Animated.View>
+        </View>
       </Pressable>
 
       {/* Calculadora desplegable */}
@@ -190,7 +251,7 @@ export function RateCard({
           <View style={styles.divider} />
 
           <View style={styles.calcBox}>
-            {/* Divisa (siempre arriba) */}
+            {/* Divisa arriba */}
             <View style={styles.calcRow}>
               <Text style={styles.calcUnit}>{code}</Text>
               <FakeCurrencyInput
@@ -198,6 +259,7 @@ export function RateCard({
                 onChangeValue={(v) => {
                   setSource('foreign');
                   setAmount(v);
+                  setTouched(true);
                 }}
                 onFocus={focusForeign}
                 precision={2}
@@ -223,16 +285,13 @@ export function RateCard({
               </Pressable>
             </View>
 
-            {/* Tasa por unidad (separador informativo) */}
             <View style={styles.rateHintRow}>
               <View style={styles.rateHintLine} />
-              <Text style={styles.rateHint}>
-                1 {code} = Bs {formatCurrency(value)}
-              </Text>
+              <Text style={styles.rateHint}>1 {code} = Bs {formatCurrency(value)}</Text>
               <View style={styles.rateHintLine} />
             </View>
 
-            {/* Bolívares (siempre abajo) */}
+            {/* Bolívares abajo */}
             <View style={styles.calcRow}>
               <Text style={styles.calcUnit}>Bs</Text>
               <FakeCurrencyInput
@@ -240,6 +299,7 @@ export function RateCard({
                 onChangeValue={(v) => {
                   setSource('bs');
                   setAmount(v);
+                  setTouched(true);
                 }}
                 onFocus={focusBs}
                 precision={2}
@@ -265,22 +325,30 @@ export function RateCard({
               </Pressable>
             </View>
 
-            {/* Acciones */}
             <View style={styles.actionsDivider} />
             <View style={styles.actionsRow}>
               <Pressable onPress={reset} style={styles.actionBtn} hitSlop={6}>
-                <RotateCcw size={16} color={COLORS.textSecondary} />
+                <RotateCcw size={15} color={COLORS.textSecondary} />
                 <Text style={styles.actionText}>Reiniciar</Text>
               </Pressable>
-              <View style={styles.actionsSep} />
               <Pressable onPress={share} style={styles.actionBtn} hitSlop={6}>
-                <Share2 size={16} color={accent} />
-                <Text style={[styles.actionText, { color: accent }]}>Compartir</Text>
+                <Share2 size={15} color={COLORS.textSecondary} />
+                <Text style={styles.actionText}>Compartir</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Animated.View>
+
+      <PaymentSelectionModal
+        isVisible={selectionModalVisible}
+        paymentMethods={paymentMethods}
+        onClose={() => setSelectionModalVisible(false)}
+        onSelect={(method) => {
+          setPendingMethod(method);
+          setSelectionModalVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -288,43 +356,43 @@ export function RateCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     padding: 18,
-    marginBottom: 14,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.22,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
-  headerPressed: {
-    opacity: 0.85,
+  cardPressed: {
+    opacity: 0.88,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 14,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 10,
   },
-  titleWrap: {
+  cardLabel: {
     flex: 1,
-    marginLeft: 12,
-  },
-  label: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  code: {
     color: COLORS.textSecondary,
-    fontSize: 13,
-    marginTop: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  topRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   changeBadge: {
     flexDirection: 'row',
@@ -332,38 +400,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
+    borderWidth: 1,
+    gap: 2,
   },
   changeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 2,
+    fontSize: 12,
+    fontWeight: '700',
   },
-  chevron: {
-    marginLeft: 10,
+  shareBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginTop: 16,
-  },
-  currencySymbol: {
-    color: COLORS.textSecondary,
-    fontSize: 18,
-    fontWeight: '600',
-    marginRight: 6,
+    marginBottom: 10,
   },
   value: {
-    color: COLORS.text,
-    fontSize: 32,
+    fontSize: 44,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  bsSuffix: {
+    fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    marginLeft: 8,
+    marginBottom: 2,
+    opacity: 0.75,
+  },
+  updateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   update: {
     color: COLORS.textSecondary,
     fontSize: 12,
-    marginTop: 10,
   },
-  // Calculadora
   calcClip: {
     overflow: 'hidden',
   },
@@ -438,6 +517,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 24,
   },
   actionBtn: {
     flexDirection: 'row',
@@ -450,10 +530,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
-  },
-  actionsSep: {
-    width: 1,
-    height: 18,
-    backgroundColor: COLORS.divider,
   },
 });

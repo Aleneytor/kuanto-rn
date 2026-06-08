@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   type LayoutChangeEvent,
   Pressable,
@@ -12,7 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DollarSign, Euro, Menu, WifiOff } from 'lucide-react-native';
+import { CalendarClock, CalendarSearch, DollarSign, Euro, Menu, WifiOff } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../theme/colors';
 import { useRates } from '../context/RatesContext';
 import { RateCard } from '../components/RateCard';
@@ -20,26 +22,21 @@ import { UsdtIcon } from '../components/UsdtIcon';
 import { HistorySection } from '../components/HistorySection';
 import { HeaderMenu, type MenuKey } from '../components/HeaderMenu';
 import { SectionModal } from '../components/SectionModal';
+import { SheetModal } from '../components/SheetModal';
+import { CalendarModal } from '../components/CalendarModal';
 import { SourcesScreen } from './SourcesScreen';
+import { PagoMovilScreen } from './PagoMovilScreen';
+import { type PaymentMethod } from '../constants/banks';
+import { CurrencyGap } from '../components/CurrencyGap';
+import { SettingsScreen } from './SettingsScreen';
 
 type CardKey = 'bcv' | 'euro' | 'parallel';
 
 const SECTION_TITLES: Record<MenuKey, string> = {
   fuentes: 'Fuentes',
-  pago: 'Pago móvil',
+  pago: 'Mis datos',
   ajustes: 'Ajustes',
 };
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <View style={styles.comingSoon}>
-      <Text style={styles.comingSoonTitle}>{label}</Text>
-      <Text style={styles.comingSoonText}>
-        Próximamente. Lo construiremos en una próxima iteración.
-      </Text>
-    </View>
-  );
-}
 
 export function HomeScreen() {
   const { rates, loading, isStale, error, refresh } = useRates();
@@ -47,11 +44,44 @@ export function HomeScreen() {
   const [expanded, setExpanded] = useState<CardKey | null>(null);
   const [dateMode, setDateMode] = useState<'today' | 'next'>('today');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [section, setSection] = useState<MenuKey | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
+  const [pagoEditingId, setPagoEditingId] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
   const cardY = useRef<Record<CardKey, number>>({ bcv: 0, euro: 0, parallel: 0 });
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    loadPaymentMethods();
+  }, []);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.2, duration: 950, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 950, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  const loadPaymentMethods = async () => {
+    try {
+      const json = await AsyncStorage.getItem('@payment_methods_data');
+      setPaymentMethods(json ? JSON.parse(json) : []);
+    } catch (err) {
+      console.error('Error loading payment methods:', err);
+    }
+  };
+
+  const closePagoModal = () => {
+    setSection(null);
+    setPagoInitialMode('list');
+    setPagoEditingId(null);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -69,8 +99,9 @@ export function HomeScreen() {
   const toggle = (key: CardKey) =>
     setExpanded((cur) => {
       const next = cur === key ? null : key;
-      // Al abrir, revela la tarjeta (sin abrir el teclado). El teclado abre al tocar un campo.
-      if (next) setTimeout(() => scrollCardIntoView(key), 300);
+      // Reubicar la vista en la tarjeta tanto al abrir como al cerrar, para que
+      // el usuario no quede "perdido" cuando el contenido se reacomoda al colapsar.
+      setTimeout(() => scrollCardIntoView(key), next ? 300 : 220);
       return next;
     });
 
@@ -90,155 +121,182 @@ export function HomeScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={[COLORS.bcvGreen + '24', 'transparent']}
-        style={styles.backdrop}
+        colors={[COLORS.bcvGreen + '1C', 'transparent']}
+        style={styles.backdropTop}
         pointerEvents="none"
       />
+      <LinearGradient
+        colors={['transparent', COLORS.bcvGreen + '08']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.backdropAccent}
+        pointerEvents="none"
+      />
+
       <SafeAreaView style={styles.safe} edges={['top']}>
-        {/* Header */}
+        {/* Header: calendario · logo · menú */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Image
-              source={require('../../assets/kuanto-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-              accessibilityLabel="Kuanto"
-            />
-            <View style={styles.subtitleRow}>
-              <View style={styles.liveDot} />
-              <Text style={styles.subtitle}>
-                {rates?.lastUpdate ? `BCV · ${rates.lastUpdate}` : 'Tasas de cambio'}
-              </Text>
-            </View>
-          </View>
-          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.menuBtn}>
-            <Menu size={24} color={COLORS.text} />
+          <Pressable
+            onPress={() => setCalendarOpen(true)}
+            hitSlop={8}
+            style={styles.iconBtn}
+          >
+            <CalendarSearch size={21} color={COLORS.text} />
+          </Pressable>
+          <Image
+            source={require('../../assets/kuanto-logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="Kuanto"
+          />
+          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.iconBtn}>
+            <Menu size={22} color={COLORS.text} />
           </Pressable>
         </View>
 
-      {loading && !rates ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.bcvGreen} />
-          <Text style={styles.loadingText}>Cargando tasas…</Text>
-        </View>
-      ) : (
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.bcvGreen}
-              colors={[COLORS.bcvGreen]}
-            />
-          }
-        >
-          {isStale && (
-            <View style={styles.offlineBanner}>
-              <WifiOff size={16} color={COLORS.parallelOrange} />
-              <Text style={styles.offlineText}>
-                {error ?? 'Sin conexión: mostrando últimas tasas conocidas.'}
-              </Text>
-            </View>
-          )}
+        {/* Update timestamp + live indicator */}
+        {rates?.lastUpdate && !useFuture && (
+          <View style={styles.stampRow}>
+            <Animated.View style={[styles.liveDot, { opacity: pulseAnim }]} />
+            <Text style={styles.updateStamp}>BCV · Actualizado {rates.lastUpdate}</Text>
+          </View>
+        )}
+        {useFuture && rates?.nextRates && (
+          <View style={styles.stampRow}>
+            <CalendarClock size={12} color={COLORS.bcvGreen} />
+            <Text style={styles.updateStamp}>
+              Próxima publicación · {rates.nextRates.date}
+            </Text>
+          </View>
+        )}
 
-          {/* Selector de fecha BCV (solo si hay tasa futura publicada) */}
-          {hasFuture && (
-            <View style={styles.dateToggle}>
-              <Pressable
-                onPress={() => setDateMode('today')}
-                style={[styles.dateBtn, dateMode === 'today' && styles.dateBtnActive]}
-              >
-                <Text
-                  style={[
-                    styles.dateBtnText,
-                    dateMode === 'today' && styles.dateBtnTextActive,
-                  ]}
-                >
-                  Hoy
+        {loading && !rates ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.bcvGreen} />
+            <Text style={styles.loadingText}>Cargando tasas…</Text>
+          </View>
+        ) : (
+          <ScrollView
+            ref={scrollRef as any}
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={COLORS.bcvGreen}
+                colors={[COLORS.bcvGreen]}
+              />
+            }
+          >
+            {isStale && (
+              <View style={styles.offlineBanner}>
+                <WifiOff size={16} color={COLORS.parallelOrange} />
+                <Text style={styles.offlineText}>
+                  {error ?? 'Sin conexión: mostrando últimas tasas conocidas.'}
                 </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setDateMode('next')}
-                style={[styles.dateBtn, dateMode === 'next' && styles.dateBtnActive]}
-              >
-                <Text
-                  style={[
-                    styles.dateBtnText,
-                    dateMode === 'next' && styles.dateBtnTextActive,
-                  ]}
-                >
-                  {rates!.nextRates!.date}
+              </View>
+            )}
+
+            {/* Subtitle + date toggle (only when future rate available) */}
+            {hasFuture && (
+              <>
+                <Text style={styles.subtitle}>
+                  Selecciona la tasa de hoy o la siguiente disponible
                 </Text>
-              </Pressable>
+                <View style={styles.dateToggle}>
+                  <Pressable
+                    onPress={() => setDateMode('today')}
+                    style={[styles.dateBtn, dateMode === 'today' && styles.dateBtnActive]}
+                  >
+                    <Text style={[styles.dateBtnText, dateMode === 'today' && styles.dateBtnTextActive]}>
+                      Hoy
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setDateMode('next')}
+                    style={[styles.dateBtn, dateMode === 'next' && styles.dateBtnActive]}
+                  >
+                    <Text style={[styles.dateBtnText, dateMode === 'next' && styles.dateBtnTextActive]}>
+                      {rates!.nextRates!.date}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+
+            <Text style={styles.hint}>Presiona una tarjeta para calcular 👇</Text>
+
+            <View onLayout={registerY('bcv')}>
+              <RateCard
+                label="Tasa BCV"
+                code="USD"
+                value={usdValue}
+                change={useFuture ? (rates?.nextRates && rates.bcv ? ((rates.nextRates.usd - rates.bcv) / rates.bcv) * 100 : 0) : (rates?.usdChange ?? 0)}
+                accent={COLORS.bcvGreen}
+                icon={DollarSign}
+                update={bcvUpdate}
+                expanded={expanded === 'bcv'}
+                onToggle={() => toggle('bcv')}
+                onCalcFocus={() => scrollCardIntoView('bcv')}
+                paymentMethods={paymentMethods}
+              />
             </View>
-          )}
 
-          <Text style={styles.hint}>Toca una tarjeta para calcular ↓</Text>
+            <View onLayout={registerY('euro')}>
+              <RateCard
+                label="Tasa BCV"
+                code="EUR"
+                value={eurValue}
+                change={useFuture ? (rates?.nextRates && rates.euro ? ((rates.nextRates.eur - rates.euro) / rates.euro) * 100 : 0) : (rates?.eurChange ?? 0)}
+                accent={COLORS.euroBlue}
+                icon={Euro}
+                update={bcvUpdate}
+                expanded={expanded === 'euro'}
+                onToggle={() => toggle('euro')}
+                onCalcFocus={() => scrollCardIntoView('euro')}
+                paymentMethods={paymentMethods}
+              />
+            </View>
 
-          <View onLayout={registerY('bcv')}>
-            <RateCard
-              label="Dólar BCV"
-              code="USD"
-              value={usdValue}
-              change={useFuture ? 0 : rates?.usdChange ?? 0}
-              accent={COLORS.bcvGreen}
-              icon={DollarSign}
-              update={bcvUpdate}
-              expanded={expanded === 'bcv'}
-              onToggle={() => toggle('bcv')}
-              onCalcFocus={() => scrollCardIntoView('bcv')}
-            />
-          </View>
+            <View onLayout={registerY('parallel')}>
+              <RateCard
+                label="Promedio"
+                code="USDT"
+                value={rates?.parallel ?? 0}
+                change={rates?.usdtChange ?? 0}
+                accent={COLORS.parallelOrange}
+                icon={UsdtIcon}
+                update={rates?.parallelUpdate ? `Hoy, ${rates.parallelUpdate}` : '—'}
+                expanded={expanded === 'parallel'}
+                onToggle={() => toggle('parallel')}
+                onCalcFocus={() => scrollCardIntoView('parallel')}
+                paymentMethods={paymentMethods}
+              />
+            </View>
 
-          <View onLayout={registerY('euro')}>
-            <RateCard
-              label="Euro BCV"
-              code="EUR"
-              value={eurValue}
-              change={useFuture ? 0 : rates?.eurChange ?? 0}
-              accent={COLORS.euroBlue}
-              icon={Euro}
-              update={bcvUpdate}
-              expanded={expanded === 'euro'}
-              onToggle={() => toggle('euro')}
-              onCalcFocus={() => scrollCardIntoView('euro')}
-            />
-          </View>
+            <Text style={styles.sectionLabel}>Historial de tasas</Text>
 
-          <View onLayout={registerY('parallel')}>
-            <RateCard
-              label="Paralelo"
-              code="USDT"
-              value={rates?.parallel ?? 0}
-              change={rates?.usdtChange ?? 0}
-              accent={COLORS.parallelOrange}
-              icon={UsdtIcon}
-              update={rates?.parallelUpdate ? `Hoy, ${rates.parallelUpdate}` : '—'}
-              expanded={expanded === 'parallel'}
-              onToggle={() => toggle('parallel')}
-              onCalcFocus={() => scrollCardIntoView('parallel')}
-            />
-          </View>
+            <HistorySection />
 
-          <HistorySection />
+            {rates && <CurrencyGap rates={rates} />}
 
-          <Text style={styles.disclaimer}>
-            Datos con fines informativos. Fuente oficial: Banco Central de Venezuela (BCV) y
-            promedio del mercado paralelo (USDT).
-          </Text>
-        </ScrollView>
-      )}
+            <Text style={styles.disclaimer}>
+              Datos con fines informativos. Fuente oficial: Banco Central de Venezuela (BCV) y
+              promedio del mercado paralelo (USDT).
+            </Text>
+          </ScrollView>
+        )}
       </SafeAreaView>
+
+      <CalendarModal isVisible={calendarOpen} onClose={() => setCalendarOpen(false)} />
 
       <HeaderMenu
         visible={menuOpen}
-        topOffset={insets.top + 56}
+        topOffset={insets.top + 52}
         onClose={() => setMenuOpen(false)}
         onSelect={(key) => {
           setMenuOpen(false);
@@ -246,14 +304,24 @@ export function HomeScreen() {
         }}
       />
       <SectionModal
-        visible={section !== null}
+        visible={section === 'fuentes' || section === 'ajustes'}
         title={section ? SECTION_TITLES[section] : ''}
         onClose={() => setSection(null)}
       >
         {section === 'fuentes' && <SourcesScreen />}
-        {section === 'pago' && <ComingSoon label="Mis datos de pago móvil" />}
-        {section === 'ajustes' && <ComingSoon label="Ajustes" />}
+        {section === 'ajustes' && <SettingsScreen onClose={() => setSection(null)} />}
       </SectionModal>
+
+      {/* "Mis datos": bottom sheet sobre el Home difuminado */}
+      <SheetModal visible={section === 'pago'} title="Mis datos" onClose={closePagoModal}>
+        <PagoMovilScreen
+          paymentMethods={paymentMethods}
+          onRefresh={loadPaymentMethods}
+          onClose={closePagoModal}
+          initialMode={pagoInitialMode}
+          initialEditingId={pagoEditingId}
+        />
+      </SheetModal>
     </View>
   );
 }
@@ -266,75 +334,65 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
-  backdrop: {
+  backdropTop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 380,
+    height: 360,
+  },
+  backdropAccent: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 220,
+    height: 260,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  menuBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: COLORS.glass,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  comingSoon: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-  },
-  comingSoonTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  comingSoonText: {
-    color: COLORS.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   logo: {
-    height: 34,
-    width: 34 * (2504 / 629),
-    alignSelf: 'flex-start',
+    height: 32,
+    width: 32 * (2504 / 629),
   },
-  subtitleRow: {
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stampRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 5,
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: COLORS.bcvGreen,
-    marginRight: 7,
   },
-  subtitle: {
+  updateStamp: {
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 12,
+    opacity: 0.7,
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingTop: 2,
   },
   center: {
     flex: 1,
@@ -361,41 +419,64 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
+  subtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    lineHeight: 20,
+  },
   dateToggle: {
     flexDirection: 'row',
     backgroundColor: COLORS.card,
-    borderRadius: 14,
-    padding: 4,
+    borderRadius: 18,
+    padding: 5,
     marginBottom: 14,
+    gap: 4,
   },
   dateBtn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 10,
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
   },
   dateBtnActive: {
-    backgroundColor: COLORS.bcvGreen + '24',
+    backgroundColor: COLORS.bcvGreen,
   },
   dateBtnText: {
     color: COLORS.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   dateBtnTextActive: {
-    color: COLORS.bcvGreen,
+    color: '#0a1a0e',
   },
   hint: {
     color: COLORS.textSecondary,
     fontSize: 13,
-    marginBottom: 12,
+    textAlign: 'center',
+    marginBottom: 14,
+    opacity: 0.7,
+  },
+  sectionLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 10,
+    marginTop: 8,
     marginLeft: 2,
+    opacity: 0.7,
   },
   disclaimer: {
     color: COLORS.textSecondary,
     fontSize: 12,
     lineHeight: 17,
-    marginTop: 4,
-    opacity: 0.8,
+    marginTop: 8,
+    opacity: 0.55,
+    textAlign: 'center',
   },
 });

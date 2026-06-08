@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Activity } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { formatChange, formatCurrency } from '../utils/formatting';
 import {
@@ -11,8 +12,8 @@ import {
 import { HistoryChart } from './HistoryChart';
 
 const SERIES: { key: HistorySeries; label: string; accent: string }[] = [
-  { key: 'usd', label: 'USD', accent: COLORS.bcvGreen },
-  { key: 'eur', label: 'EUR', accent: COLORS.euroBlue },
+  { key: 'usd', label: 'BCV USD', accent: COLORS.bcvGreen },
+  { key: 'eur', label: 'BCV EUR', accent: COLORS.euroBlue },
   { key: 'parallel', label: 'USDT', accent: COLORS.parallelOrange },
 ];
 
@@ -50,24 +51,26 @@ export function HistorySection() {
 
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Historial</Text>
-        <View style={styles.seriesChips}>
-          {SERIES.map((s) => {
-            const activeS = s.key === series;
-            return (
-              <Pressable
-                key={s.key}
-                onPress={() => setSeries(s.key)}
-                style={[styles.seriesChip, activeS && { backgroundColor: s.accent + '24' }]}
-              >
-                <Text style={[styles.seriesChipText, activeS && { color: s.accent }]}>
-                  {s.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <View style={styles.titleRow}>
+        <Activity size={15} color={COLORS.textSecondary} />
+        <Text style={styles.title}>ACTIVIDAD HISTÓRICA</Text>
+      </View>
+
+      <View style={styles.seriesRow}>
+        {SERIES.map((s) => {
+          const activeS = s.key === series;
+          return (
+            <Pressable
+              key={s.key}
+              onPress={() => setSeries(s.key)}
+              style={[styles.seriesChip, activeS && { backgroundColor: s.accent }]}
+            >
+              <Text style={[styles.seriesChipText, activeS && styles.seriesChipTextActive]}>
+                {s.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.valueRow}>
@@ -118,30 +121,39 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
   },
-  headerRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  seriesChips: {
-    flexDirection: 'row',
     gap: 6,
   },
+  title: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  seriesRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 14,
+    gap: 4,
+  },
   seriesChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
     borderRadius: 9,
-    backgroundColor: COLORS.glass,
   },
   seriesChipText: {
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  seriesChipTextActive: {
+    color: '#0a1a0e',
   },
   valueRow: {
     flexDirection: 'row',

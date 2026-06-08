@@ -1,5 +1,5 @@
-import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Database, Settings, Smartphone } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 
@@ -7,7 +7,7 @@ export type MenuKey = 'fuentes' | 'pago' | 'ajustes';
 
 const ITEMS: { key: MenuKey; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }[] = [
   { key: 'fuentes', label: 'Fuentes', icon: Database },
-  { key: 'pago', label: 'Mis datos de pago móvil', icon: Smartphone },
+  { key: 'pago', label: 'Mis datos', icon: Smartphone },
   { key: 'ajustes', label: 'Ajustes', icon: Settings },
 ];
 
@@ -18,17 +18,35 @@ interface Props {
   onSelect: (key: MenuKey) => void;
 }
 
+/**
+ * Menú desplegable anclado arriba-derecha. Se renderiza como overlay dentro de
+ * la vista (no como Modal nativo) para que cerrarlo sea instantáneo y no retrase
+ * la apertura de la pantalla destino (que sí es un Modal).
+ */
 export function HeaderMenu({ visible, topOffset, onClose, onSelect }: Props) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      anim.setValue(0);
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, anim]);
+
+  if (!visible) return null;
+
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={[styles.menu, { top: topOffset }]}>
+      <Animated.View
+        style={[styles.menu, { top: topOffset, opacity: anim, transform: [{ translateY }] }]}
+      >
         {ITEMS.map((it, i) => (
           <Pressable
             key={it.key}
@@ -43,8 +61,8 @@ export function HeaderMenu({ visible, topOffset, onClose, onSelect }: Props) {
             <Text style={styles.itemText}>{it.label}</Text>
           </Pressable>
         ))}
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 }
 
