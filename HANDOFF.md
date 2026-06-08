@@ -32,7 +32,7 @@ Reconstrucción **desde cero** en **React Native (Expo + TypeScript)** de la app
 ## Backend / datos (Supabase)
 
 - Tablas: `bcv_rates_history` (date, usd, eur) y `p2p_rate_history` (price, details, created_at). `details` es JSON `{binance:{buy,sell}, bybit:{...}, yadio:{...}}`.
-- Credenciales en `.env` (NO está en git; ver `.env.example`):
+- Credenciales en `.env` (**incluido en el repo**; la `anon key` es pública por diseño, protegida por RLS):
   - `EXPO_PUBLIC_SUPABASE_URL=https://goiaxsdsrwxlebpsnbrx.supabase.co`
   - `EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>` — la `anon key` es pública por diseño (protegida por RLS). Cópiala desde `.env` de la otra máquina, o desde `src/database/supabaseClient.js` del repo original.
 
@@ -75,7 +75,7 @@ assets/                      # kuanto-logo.png, sources/ (bcv,bybit,yadio), icon
 git clone <url-del-nuevo-repo> kuanto-rn
 cd kuanto-rn
 npm install
-# crea .env (ver .env.example) con las dos variables EXPO_PUBLIC_SUPABASE_*
+# .env ya viene incluido en el repo (claves de Supabase públicas por RLS)
 npx expo start            # escanea el QR con Expo Go (App Store / Play Store = SDK 54)
 ```
 
