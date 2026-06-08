@@ -2,6 +2,20 @@
 
 > Lee esto al retomar el proyecto en otra máquina. Resume el estado, las decisiones y cómo continuar. Complementa a `AGENTS.md` y `CLAUDE.md`.
 
+## ▶️ Por dónde seguir (próxima sesión)
+
+**Lo último hecho:** sección **Fuentes** con tasas en vivo (BCV + Binance/Bybit/Yadio), detrás del menú **☰** (arriba a la derecha del Home).
+
+**Opciones para continuar** (elige una):
+
+1. **Mis datos de pago móvil** — pantalla para guardar los datos de pago móvil del usuario (banco, cédula, teléfono) y poder copiarlos/compartirlos rápido. Hoy es un placeholder `ComingSoon` en `HomeScreen.tsx`; se abre desde `HeaderMenu.tsx` (clave `'pago'`). Persistir con AsyncStorage. **Es la opción recomendada para seguir.**
+2. **Ajustes** — pantalla de ajustes (placeholder hoy, clave `'ajustes'`). Ideas: fuente/decimales, "Acerca de", enlaces.
+3. **Ícono y splash** del rebranding — configurar en `app.json` (assets disponibles en el repo original: `icon.png`, `adaptive-icon.png`, `splash-icon.png`), o crear unos nuevos.
+
+**Rutina:** antes de programar → `git pull`. Al terminar → `npx tsc --noEmit` y `npx expo export --platform ios` para verificar, luego `git add -A && git commit && git push`.
+
+---
+
 ## Qué es
 
 Reconstrucción **desde cero** en **React Native (Expo + TypeScript)** de la app de tasas de cambio **Kuanto** (rebranding), reusando el **backend Supabase** existente. Compatible iOS + Android. Tema oscuro/AMOLED con los colores de marca.
