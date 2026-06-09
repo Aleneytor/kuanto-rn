@@ -4,22 +4,35 @@
 
 ## ▶️ Por dónde seguir (próxima sesión)
 
-**Estado:** Home rediseñado para parecerse a la **web** (kuanto.online/app). Funcionan: calculadora integrada, **calendario** (buscar tasa por fecha), historial, brecha del día, **Mis datos** (gestión de métodos de pago) en hoja inferior con fondo difuminado, **Fuentes** y **Ajustes**.
+**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel, con caché), **compartir tasa + método de pago** arreglado, **Fuentes** y **Ajustes**. Verificado con `npm run typecheck` + `npx expo export --platform ios`.
 
-**Antes de empezar:** `git pull` (este árbol se sincronizó desde otra máquina; ver changelog abajo).
+**Antes de empezar:** `git pull`. **Ojo:** `npx tsc --noEmit` **crashea** por un bug de pila de Node v25; usa el script nuevo **`npm run typecheck`** (aplica `--stack-size=8000`).
 
-**Opciones para continuar** (elige una):
+**Pendientes (elige uno):**
 
-1. **Ícono y splash** de la app (rebranding) en `app.json` — es el pendiente real más importante. Assets en el repo web original: `icon.png`, `adaptive-icon.png`, `splash-icon.png`.
-2. **Pulir "Mis datos"**: hacer que el panel (`SheetModal`) se ajuste a la **altura del contenido** (hoja flotante) en lugar de un panel translúcido de altura fija, para que el Home difuminado se vea más claro arriba. Requiere resolver el scroll del formulario con `maxHeight` (hoy `PagoMovilScreen` usa `KeyboardAvoidingView flex:1`).
-3. **Compartir tasa histórica** desde el calendario (hoy el calendario solo consulta; no comparte).
-4. **Notificaciones reales** (hoy el toggle de Ajustes solo guarda la preferencia en AsyncStorage).
+1. **Tutorial de bienvenida (onboarding)** en el primer arranque que lleve al usuario a **cargar sus datos de pago móvil** (`PagoMovilScreen`). Detectar "primera vez" con un flag en AsyncStorage (p. ej. `@onboarding_done`) y abrir la sección `'pago'` o un mini paso a paso. *(Pedido por el usuario.)*
+2. **Notificaciones reales**: hoy el toggle de Ajustes solo guarda la preferencia en AsyncStorage. Implementar con `expo-notifications` (avisos de nueva tasa BCV / movimiento del paralelo). *(Pedido por el usuario.)*
+3. **Vista diaria de USDT en Supabase** para que el **Historial Completo cargue rápido la primera vez**: hoy baja miles de ticks P2P y los promedia en el cliente. Crear una vista/RPC que devuelva el promedio diario ya calculado y consumirla desde `rateService`. Requiere correr SQL en el panel de Supabase (la `anon key` es de solo lectura).
+4. **Ícono y splash** de la app (rebranding) en `app.json`. Assets en el repo web original: `icon.png`, `adaptive-icon.png`, `splash-icon.png`.
+5. **Compartir tasa histórica** desde el calendario (hoy solo consulta).
 
-**Rutina:** `git pull` → programar → `npx tsc --noEmit` → `git add -A && git commit && git push`.
+**Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
 
 ---
 
 ## 🗓️ Changelog
+
+### Sesión 2026-06-08 — rendimiento, arreglos y "Mis datos" v2
+
+**Arreglos:**
+- **Compartir tasa + método de pago**: el share no se disparaba (el `useEffect` cancelaba su propio `setTimeout` en el cleanup). Reescrito con `useRef` + `onDismiss` del modal (iOS) y respaldo por timeout (`RateCard.tsx`, `PaymentSelectionModal.tsx`).
+- **Typecheck**: `tsc` no compilaba por trabajo en curso — clave `history` faltante en `SECTION_TITLES`; API vieja de `expo-file-system` en `exportService` → import desde `expo-file-system/legacy` (SDK 54); carpeta de referencia `temp_kuanto_web/` excluida de `tsconfig` + `.gitignore`.
+
+**"Mis datos" reconstruida (v2):** la versión previa (1521 líneas, hoja `SheetModal` con `expo-blur`) lagueaba al abrir. Reescrita ligera (`PagoMovilScreen.tsx`, ~1090 líneas) y presentada en el **`SectionModal` nativo** (como Fuentes/Ajustes, sin lag); buscador de banco como **overlay en pantalla** (no Modal anidado); barra **"Listo"** sobre el teclado numérico (iOS, `InputAccessoryView`) + cerrar al deslizar. Se **borró `SheetModal.tsx`** y la dependencia **`expo-blur`**. El modelo de datos (`banks.ts`) y `PaymentSelectionModal` quedaron intactos → el compartir tasa+método sigue igual.
+
+**Historial Completo más rápido:** bajaba miles de ticks P2P en **cada** apertura, sin caché. Ahora: **caché** en AsyncStorage (muestra al instante, refresca en 2º plano solo si >15 min), consulta **diferida** tras la animación de apertura, y **ventana de 21 días** (no 30). `rateService` ganó un parámetro opcional `fromDateOverride`. Pendiente real para la 1ª carga: agregación diaria en Supabase (ver "Por dónde seguir" #3). Archivos: `HistoryModal.tsx`, `rateService.ts`.
+
+**Infra:** script **`npm run typecheck`** (`node --stack-size=8000 … tsc --noEmit`) por el crash de pila de Node v25. Este commit también consolida el trabajo previo sin commitear: **Historial Completo** (`HistoryModal.tsx`), **export a Excel** (`exportService.ts`, `xlsx` + `expo-sharing` + `expo-file-system`) y **Ajustes**.
 
 ### Sincronización 2026-06 (trabajo multi-agente)
 

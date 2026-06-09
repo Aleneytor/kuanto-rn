@@ -18,6 +18,8 @@ interface Props {
   paymentMethods: PaymentMethod[];
   onClose: () => void;
   onSelect: (method: PaymentMethod | null) => void;
+  /** iOS: se llama cuando el Modal terminó de cerrarse (para presentar el share). */
+  onDismiss?: () => void;
 }
 
 const shortenBankName = (name: string) => {
@@ -45,7 +47,7 @@ const shortenBankName = (name: string) => {
     .trim();
 };
 
-export function PaymentSelectionModal({ isVisible, paymentMethods, onClose, onSelect }: Props) {
+export function PaymentSelectionModal({ isVisible, paymentMethods, onClose, onSelect, onDismiss }: Props) {
   const handleSelect = (method: PaymentMethod | null) => {
     onSelect(method);
     onClose();
@@ -57,6 +59,7 @@ export function PaymentSelectionModal({ isVisible, paymentMethods, onClose, onSe
       animationType="slide"
       transparent
       onRequestClose={onClose}
+      onDismiss={onDismiss}
       statusBarTranslucent
     >
       <View style={styles.overlay}>

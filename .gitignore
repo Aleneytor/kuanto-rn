@@ -42,3 +42,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# copia local del repo web (solo referencia, no parte de la app)
+temp_kuanto_web/

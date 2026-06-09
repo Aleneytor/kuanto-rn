@@ -4,13 +4,15 @@
   "main": "index.ts",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/bottom-tabs": "^7.16.2",
     "@react-navigation/native": "^7.2.5",
     "@supabase/supabase-js": "^2.107.0",
     "expo": "^54.0.35",
-    "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
+    "expo-file-system": "~19.0.23",
     "expo-linear-gradient": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
     "lucide-react-native": "^1.17.0",
     "react": "19.1.0",
@@ -19,7 +21,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
-    "react-native-url-polyfill": "^3.0.0"
+    "react-native-url-polyfill": "^3.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
@@ -29,7 +32,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "node --stack-size=8000 ./node_modules/typescript/bin/tsc --noEmit"
   },
   "private": true
 }

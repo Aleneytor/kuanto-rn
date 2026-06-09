@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { FakeCurrencyInput } from 'react-native-currency-input';
 import {
@@ -120,16 +120,13 @@ export function RateCard({
   };
 
   const [selectionModalVisible, setSelectionModalVisible] = useState(false);
-  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (pendingMethod !== undefined && !selectionModalVisible) {
-      const method = pendingMethod;
-      setPendingMethod(undefined);
-      const t = setTimeout(() => performShare(method), 500);
-      return () => clearTimeout(t);
-    }
-  }, [selectionModalVisible, pendingMethod]);
+  // Método elegido pendiente de compartir mientras el modal de selección se
+  // cierra. `undefined` = nada pendiente; `null` = "Sin datos de pago"; objeto =
+  // método. En iOS el share sheet (UIActivityViewController) NO puede presentarse
+  // mientras el Modal nativo sigue en pantalla o en transición, así que se
+  // dispara en `onDismiss` (cuando terminó de cerrarse), con un timeout de
+  // respaldo. Usamos un ref (no estado) para no re-renderizar ni cancelarlo.
+  const pendingShareRef = useRef<PaymentMethod | null | undefined>(undefined);
 
   const share = () => {
     if (paymentMethods.length > 0) {
@@ -171,6 +168,15 @@ export function RateCard({
     } catch {
       /* usuario canceló */
     }
+  };
+
+  // Dispara el share que quedó pendiente al cerrarse el modal de selección.
+  // Idempotente: limpia el ref antes de compartir, así onDismiss y el timeout de
+  // respaldo no provocan un doble share.
+  const firePendingShare = () => {
+    const method = pendingShareRef.current;
+    pendingShareRef.current = undefined;
+    if (method !== undefined) performShare(method);
   };
 
   // "TASA BCV (USD)" / "TASA BCV (EUR)" / "PROMEDIO (USDT)"
@@ -345,9 +351,13 @@ export function RateCard({
         paymentMethods={paymentMethods}
         onClose={() => setSelectionModalVisible(false)}
         onSelect={(method) => {
-          setPendingMethod(method);
-          setSelectionModalVisible(false);
+          pendingShareRef.current = method;
+          // iOS: el share aparece en onDismiss (al terminar de cerrarse el
+          // modal). El timeout es red de seguridad por si onDismiss no llega.
+          // Android no tiene ese conflicto: comparte en cuanto cierra.
+          setTimeout(firePendingShare, Platform.OS === 'ios' ? 600 : 60);
         }}
+        onDismiss={firePendingShare}
       />
     </View>
   );

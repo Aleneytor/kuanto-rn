@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Animated,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -13,11 +14,12 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Bell,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
-  ExternalLink,
   FileText,
   Globe,
   Mail,
@@ -111,14 +113,32 @@ export function SettingsScreen({ onClose }: Props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Banner de marca */}
+        <View style={styles.brandingCard}>
+          <LinearGradient
+            colors={[COLORS.bcvGreen + '1A', 'transparent']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <Image
+            source={require('../../assets/kuanto-logo.png')}
+            style={styles.brandingLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.brandingSubtitle}>
+            Consulta de tasas oficiales y promedio en tiempo real
+          </Text>
+        </View>
+
         {/* Sección General */}
         <Text style={styles.sectionHeader}>General</Text>
         <View style={styles.sectionCard}>
           {/* Fila: Notificaciones */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: COLORS.bcvGreen + '14' }]}>
-                <Bell size={20} color={COLORS.bcvGreen} />
+              <View style={[styles.iconBox, styles.greenIconBox]}>
+                <Bell size={18} color={COLORS.bcvGreen} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Notificaciones</Text>
@@ -142,15 +162,15 @@ export function SettingsScreen({ onClose }: Props) {
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: COLORS.euroBlue + '14' }]}>
-                <Globe size={20} color={COLORS.euroBlue} />
+              <View style={[styles.iconBox, styles.blueIconBox]}>
+                <Globe size={18} color={COLORS.euroBlue} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Sitio Web</Text>
                 <Text style={styles.rowSubtitle}>Visita kuanto.online</Text>
               </View>
             </View>
-            <ExternalLink size={16} color={COLORS.textSecondary} />
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
           </Pressable>
         </View>
 
@@ -163,15 +183,15 @@ export function SettingsScreen({ onClose }: Props) {
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: COLORS.parallelOrange + '14' }]}>
-                <Share2 size={20} color={COLORS.parallelOrange} />
+              <View style={[styles.iconBox, styles.orangeIconBox]}>
+                <Share2 size={18} color={COLORS.parallelOrange} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Compartir App</Text>
                 <Text style={styles.rowSubtitle}>Invita a tus amigos</Text>
               </View>
             </View>
-            <ExternalLink size={16} color={COLORS.textSecondary} />
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
           </Pressable>
 
           <View style={styles.divider} />
@@ -182,15 +202,15 @@ export function SettingsScreen({ onClose }: Props) {
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#FFD60A14' }]}>
-                <Star size={20} color="#FFD60A" />
+              <View style={[styles.iconBox, styles.yellowIconBox]}>
+                <Star size={18} color="#FFD60A" />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Calificar App</Text>
                 <Text style={styles.rowSubtitle}>¡Tu opinión importa!</Text>
               </View>
             </View>
-            <ExternalLink size={16} color={COLORS.textSecondary} />
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
           </Pressable>
         </View>
 
@@ -203,15 +223,15 @@ export function SettingsScreen({ onClose }: Props) {
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: COLORS.glassStrong }]}>
-                <Mail size={20} color={COLORS.textSecondary} />
+              <View style={[styles.iconBox, styles.grayIconBox]}>
+                <Mail size={18} color={COLORS.textSecondary} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Contactar</Text>
                 <Text style={styles.rowSubtitle}>info@kuanto.online</Text>
               </View>
             </View>
-            <ExternalLink size={16} color={COLORS.textSecondary} />
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
           </Pressable>
 
           <View style={styles.divider} />
@@ -219,11 +239,15 @@ export function SettingsScreen({ onClose }: Props) {
           {/* Fila Expandible: Aviso Legal */}
           <Pressable
             onPress={() => setLegalExpanded(!legalExpanded)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            style={({ pressed }) => [
+              styles.row,
+              pressed && styles.rowPressed,
+              legalExpanded && { backgroundColor: 'rgba(255, 255, 255, 0.02)' },
+            ]}
           >
             <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: COLORS.glassStrong }]}>
-                <FileText size={20} color={COLORS.textSecondary} />
+              <View style={[styles.iconBox, styles.grayIconBox]}>
+                <FileText size={18} color={COLORS.textSecondary} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>Aviso Legal</Text>
@@ -294,15 +318,52 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 40,
   },
+  brandingCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  brandingLogo: {
+    height: 34,
+    width: 34 * (2504 / 629),
+    marginBottom: 8,
+  },
+  brandingSubtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 18,
+    opacity: 0.8,
+  },
   sectionHeader: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     marginBottom: 10,
     marginLeft: 4,
-    marginTop: 18,
+    marginTop: 14,
+    opacity: 0.7,
   },
   sectionCard: {
     backgroundColor: COLORS.card,
@@ -310,12 +371,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.divider,
     overflow: 'hidden',
+    marginBottom: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
       },
       android: {
         elevation: 3,
@@ -326,7 +388,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 15,
     paddingHorizontal: 16,
   },
   rowPressed: {
@@ -340,17 +402,38 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
+    borderWidth: 1,
+  },
+  greenIconBox: {
+    backgroundColor: 'rgba(2, 223, 130, 0.06)',
+    borderColor: 'rgba(2, 223, 130, 0.15)',
+  },
+  blueIconBox: {
+    backgroundColor: 'rgba(0, 122, 255, 0.06)',
+    borderColor: 'rgba(0, 122, 255, 0.15)',
+  },
+  orangeIconBox: {
+    backgroundColor: 'rgba(255, 149, 0, 0.06)',
+    borderColor: 'rgba(255, 149, 0, 0.15)',
+  },
+  yellowIconBox: {
+    backgroundColor: 'rgba(255, 214, 10, 0.06)',
+    borderColor: 'rgba(255, 214, 10, 0.15)',
+  },
+  grayIconBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   rowText: {
     flex: 1,
   },
   rowTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.text,
   },
   rowSubtitle: {
@@ -365,34 +448,41 @@ const styles = StyleSheet.create({
   },
   legalExpandedContent: {
     paddingHorizontal: 18,
-    paddingBottom: 18,
-    paddingTop: 4,
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    paddingBottom: 20,
+    paddingTop: 14,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.divider,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   legalParagraph: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: COLORS.textSecondary,
     marginBottom: 12,
     textAlign: 'justify',
+    opacity: 0.9,
   },
   legalBold: {
     fontWeight: '700',
     color: COLORS.text,
   },
   footer: {
-    marginTop: 36,
+    marginTop: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
   footerText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
+    opacity: 0.8,
   },
   footerCopyright: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.3)',
-    marginTop: 4,
+    color: COLORS.textSecondary,
+    opacity: 0.35,
   },
 });

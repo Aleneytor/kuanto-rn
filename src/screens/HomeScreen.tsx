@@ -22,8 +22,8 @@ import { UsdtIcon } from '../components/UsdtIcon';
 import { HistorySection } from '../components/HistorySection';
 import { HeaderMenu, type MenuKey } from '../components/HeaderMenu';
 import { SectionModal } from '../components/SectionModal';
-import { SheetModal } from '../components/SheetModal';
 import { CalendarModal } from '../components/CalendarModal';
+import { HistoryModal } from '../components/HistoryModal';
 import { SourcesScreen } from './SourcesScreen';
 import { PagoMovilScreen } from './PagoMovilScreen';
 import { type PaymentMethod } from '../constants/banks';
@@ -36,6 +36,8 @@ const SECTION_TITLES: Record<MenuKey, string> = {
   fuentes: 'Fuentes',
   pago: 'Mis datos',
   ajustes: 'Ajustes',
+  // 'history' abre HistoryModal (no usa SectionModal); presente solo por tipado.
+  history: 'Historial completo',
 };
 
 export function HomeScreen() {
@@ -45,6 +47,7 @@ export function HomeScreen() {
   const [dateMode, setDateMode] = useState<'today' | 'next'>('today');
   const [menuOpen, setMenuOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [section, setSection] = useState<MenuKey | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
@@ -293,6 +296,11 @@ export function HomeScreen() {
       </SafeAreaView>
 
       <CalendarModal isVisible={calendarOpen} onClose={() => setCalendarOpen(false)} />
+      <HistoryModal
+        visible={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onOpenCalendar={() => setCalendarOpen(true)}
+      />
 
       <HeaderMenu
         visible={menuOpen}
@@ -300,28 +308,30 @@ export function HomeScreen() {
         onClose={() => setMenuOpen(false)}
         onSelect={(key) => {
           setMenuOpen(false);
-          setSection(key);
+          if (key === 'history') {
+            setHistoryOpen(true);
+          } else {
+            setSection(key);
+          }
         }}
       />
       <SectionModal
-        visible={section === 'fuentes' || section === 'ajustes'}
+        visible={section === 'fuentes' || section === 'ajustes' || section === 'pago'}
         title={section ? SECTION_TITLES[section] : ''}
-        onClose={() => setSection(null)}
+        onClose={closePagoModal}
       >
         {section === 'fuentes' && <SourcesScreen />}
         {section === 'ajustes' && <SettingsScreen onClose={() => setSection(null)} />}
+        {section === 'pago' && (
+          <PagoMovilScreen
+            paymentMethods={paymentMethods}
+            onRefresh={loadPaymentMethods}
+            onClose={closePagoModal}
+            initialMode={pagoInitialMode}
+            initialEditingId={pagoEditingId}
+          />
+        )}
       </SectionModal>
-
-      {/* "Mis datos": bottom sheet sobre el Home difuminado */}
-      <SheetModal visible={section === 'pago'} title="Mis datos" onClose={closePagoModal}>
-        <PagoMovilScreen
-          paymentMethods={paymentMethods}
-          onRefresh={loadPaymentMethods}
-          onClose={closePagoModal}
-          initialMode={pagoInitialMode}
-          initialEditingId={pagoEditingId}
-        />
-      </SheetModal>
     </View>
   );
 }

@@ -468,3 +468,145 @@ export async function fetchRatesByDate(dateISO: string): Promise<DateRates> {
     isExact: bcvDate === dateISO,
   };
 }
+
+/**
+ * Obtiene el histórico de tasas BCV (USD/EUR) desde Supabase.
+ */
+export async function fetchHistoricalRates(
+  period: 'week' | 'month' | 'year' | 'all' = 'week',
+  fromDateOverride?: string
+): Promise<HistoryPoint[]> {
+  try {
+    const fromDate = fromDateOverride ?? getDateByPeriodExtended(period);
+    console.log(`[RateService] Fetching historical rates from Supabase since ${fromDate}`);
+
+    const { data, error } = await supabase
+      .from('bcv_rates_history')
+      .select('date, usd, eur')
+      .gte('date', fromDate)
+      .order('date', { ascending: false })
+      .limit(5000);
+
+    if (error) {
+      console.error('[RateService] Supabase error fetching historical rates:', error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    return data.map((r) => ({
+      date: r.date,
+      usd: toNumber(r.usd),
+      eur: toNumber(r.eur),
+    }));
+  } catch (error) {
+    console.error('[RateService] Error fetching historical rates:', error);
+    return [];
+  }
+}
+
+export interface UsdtHistoryPoint {
+  date: string;
+  usdt: number;
+}
+
+/**
+ * Obtiene el histórico de USDT P2P de Supabase y calcula los promedios diarios.
+ */
+export async function fetchUsdtHistory(
+  period: 'week' | 'month' | 'year' | 'all' = 'week',
+  fromDateOverride?: string
+): Promise<UsdtHistoryPoint[]> {
+  try {
+    const fromDate = fromDateOverride ?? getDateByPeriodExtended(period);
+    let allData: { price: number | string; created_at: string }[] = [];
+    let hasMore = true;
+    let page = 0;
+    const pageSize = 1000;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('p2p_rate_history')
+        .select('price, created_at')
+        .gte('created_at', `${fromDate}T00:00:00.000Z`)
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) {
+        console.error('[RateService] Error fetching USDT history from Supabase:', error);
+        return [];
+      }
+
+      if (data && data.length > 0) {
+        allData = allData.concat(
+          data.map((d) => ({
+            price: d.price,
+            created_at: d.created_at,
+          }))
+        );
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+
+      if (page >= 30) {
+        console.warn('[RateService] Safety limit reached while fetching USDT history.');
+        hasMore = false;
+      }
+    }
+
+    if (allData.length === 0) {
+      return [];
+    }
+
+    const dailyData: Record<string, { sum: number; count: number }> = {};
+
+    allData.forEach((item) => {
+      const utcDate = new Date(item.created_at);
+      const vetDate = new Date(utcDate.getTime() - 4 * 60 * 60 * 1000);
+      const dateStr = vetDate.toISOString().split('T')[0];
+
+      if (!dailyData[dateStr]) {
+        dailyData[dateStr] = { sum: 0, count: 0 };
+      }
+
+      const price = toNumber(item.price);
+      if (price > 0) {
+        dailyData[dateStr].sum += price;
+        dailyData[dateStr].count++;
+      }
+    });
+
+    return Object.keys(dailyData)
+      .map((date) => ({
+        date,
+        usdt: dailyData[date].count > 0 ? dailyData[date].sum / dailyData[date].count : 0,
+      }))
+      .filter((item) => item.usdt > 0)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  } catch (error) {
+    console.error('[RateService] Error in fetchUsdtHistory:', error);
+    return [];
+  }
+}
+
+/**
+ * Obtiene la fecha límite según el periodo, incluyendo soporte para 'all' (desde 2020).
+ */
+function getDateByPeriodExtended(period: 'week' | 'month' | 'year' | 'all'): string {
+  const now = new Date();
+  const vetTime = now.getTime() - 4 * 60 * 60 * 1000;
+  const d = new Date(vetTime);
+
+  if (period === 'week') d.setDate(d.getDate() - 7);
+  else if (period === 'month') d.setDate(d.getDate() - 30);
+  else if (period === 'year') d.setFullYear(d.getFullYear() - 1);
+  else if (period === 'all') d.setFullYear(2020, 0, 1);
+
+  return d.toISOString().split('T')[0];
+}
+
