@@ -29,6 +29,8 @@
 
 **Infra:** script **`npm run typecheck`** (`node --stack-size=8000 … tsc --noEmit`) por el crash de pila de Node v25. Este commit también consolida el trabajo previo sin commitear: **Historial Completo** (`HistoryModal.tsx`), **export a Excel** (`exportService.ts`, `xlsx` + `expo-sharing` + `expo-file-system`) y **Ajustes**.
 
+**Marca (ícono y splash):** ícono de Kuanto ("$Ҝ" del repo web) en `app.json` — `icon` (iOS) y `adaptiveIcon` con foreground sobre verde `#02DF82` (Android), y splash vía plugin **`expo-splash-screen`** (ícono centrado sobre `#1c1c1e`). Se reemplazaron los assets de plantilla por los de marca (`assets/icon.png`, `adaptive-icon.png`, `splash-icon.png`, `favicon.png`). **Ojo:** el ícono custom **no se ve en Expo Go** (usa el de Expo Go); aparece solo en un build (EAS/dev build). El splash sí se refleja.
+
 ### Sincronización 2026-06 (trabajo multi-agente)
 
 > **Estado base al iniciar:** commit `b104fdb`, con bastante trabajo **sin commitear** de agentes previos en el árbol (nuevas pantallas y assets). Varios agentes trabajaron sobre el mismo código; lo de abajo es el estado **acumulado** que se consolidó en este commit de sincronización. No todo es atribuible a una sola sesión.
