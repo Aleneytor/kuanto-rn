@@ -595,6 +595,36 @@ export async function fetchUsdtHistory(
 }
 
 /**
+ * Promedios diarios de USDT desde la vista agregada `p2p_daily_avg` (rápido:
+ * ~1 fila por día en vez de miles de ticks). Si la vista todavía no existe en
+ * Supabase, cae automáticamente al método por ticks (`fetchUsdtHistory`).
+ * Crea la vista con `db/p2p_daily_avg.sql`.
+ */
+export async function fetchUsdtDailyAverages(
+  period: 'week' | 'month' | 'year' | 'all' = 'week',
+  fromDateOverride?: string
+): Promise<UsdtHistoryPoint[]> {
+  const fromDate = fromDateOverride ?? getDateByPeriodExtended(period);
+
+  const { data, error } = await supabase
+    .from('p2p_daily_avg')
+    .select('day, usdt')
+    .gte('day', fromDate)
+    .order('day', { ascending: false })
+    .limit(5000);
+
+  if (error || !data) {
+    // La vista no existe aún (o falló): respaldo descargando ticks.
+    console.warn('[RateService] p2p_daily_avg no disponible, usando ticks:', error?.message);
+    return fetchUsdtHistory(period, fromDateOverride);
+  }
+
+  return (data as Array<{ day: string; usdt: number | string }>)
+    .map((r) => ({ date: r.day, usdt: toNumber(r.usdt) }))
+    .filter((e) => e.usdt > 0);
+}
+
+/**
  * Obtiene la fecha límite según el periodo, incluyendo soporte para 'all' (desde 2020).
  */
 function getDateByPeriodExtended(period: 'week' | 'month' | 'year' | 'all'): string {

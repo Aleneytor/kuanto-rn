@@ -4,18 +4,30 @@
 
 ## ▶️ Por dónde seguir (próxima sesión)
 
-**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (sin lag), **Historial Completo** (lista de 14 días + exportación de rango de fechas a Excel .xlsx de forma nativa) implementada, **Ajustes** con rediseño visual premium de marca.
+**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel .xlsx, con caché y agregación diaria), **Fuentes**, **Ajustes** (rediseño de marca), **compartir tasa + método de pago**, e **ícono + splash de marca**. Verificado con `npm run typecheck` + `npx expo export --platform ios`.
 
-**Antes de empezar:** `git pull`.
+**Antes de empezar:** `git pull`. Nota: `npx tsc --noEmit` crashea por un bug de pila de Node v25 → usá **`npm run typecheck`**.
 
-**Pendientes prioritarios (siguiente sesión):**
+**⚠️ Acción inmediata (pendiente de la sesión 2026-06-09):** correr **`db/p2p_daily_avg.sql`** una vez en el SQL Editor de Supabase para activar la carga rápida del Historial. Hasta entonces funciona con respaldo (más lento solo en la 1ª carga; reaperturas instantáneas por caché).
 
-1. **Tutorial de bienvenida (onboarding)**: Mostrar un mini tutorial/guía al abrir la app por primera vez que lleve al usuario a configurar sus datos de pago móvil (`PagoMovilScreen` / sección `'pago'`). Se puede gestionar con un flag persistido en AsyncStorage (p. ej., `@kuanto/onboarding_done`).
-2. **Notificaciones reales**: Implementar notificaciones automáticas/push al publicarse nuevas tasas oficiales o al actualizarse el paralelo mediante `expo-notifications` (el toggle en Ajustes ya está diseñado e integrado a AsyncStorage).
+**Pendientes (elige uno):**
+
+1. **Tutorial de bienvenida (onboarding)**: mini guía al abrir la app por primera vez que lleve a configurar los datos de pago móvil (`PagoMovilScreen` / sección `'pago'`). Flag persistido en AsyncStorage (p. ej., `@kuanto/onboarding_done`).
+2. **Notificaciones reales**: con `expo-notifications` (nueva tasa BCV / movimiento del paralelo). El toggle de Ajustes ya guarda la preferencia en AsyncStorage. Ojo: en Expo Go SDK 54 las locales funcionan, el push remoto necesita un dev build.
+3. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
+4. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
+
+**Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
 
 ---
 
 ## 🗓️ Changelog
+
+### Sesión 2026-06-09 — Historial rápido (agregación en Supabase)
+
+El Historial bajaba **miles de ticks P2P** para promediarlos en el cliente. Se añadió la vista **`p2p_daily_avg`** (promedio diario de USDT en hora de Venezuela) — SQL en **`db/p2p_daily_avg.sql`**. `rateService.fetchUsdtDailyAverages()` la consume y **cae al método por ticks si la vista no existe** (la app no se rompe antes de crearla). La usan `HistoryModal` (lista) y `exportService` (Excel). El gráfico del Home (`fetchSeriesHistory('parallel')`) todavía usa ticks — migración opcional pendiente.
+
+> **⚠️ ACCIÓN PENDIENTE:** correr `db/p2p_daily_avg.sql` una vez en el **SQL Editor de Supabase** para activar la carga rápida. Hasta entonces, el Historial funciona con el respaldo (más lento solo en la 1ª carga; las reaperturas ya son instantáneas por caché).
 
 ### Sesión 2026-06-08 — rendimiento, arreglos y "Mis datos" v2
 

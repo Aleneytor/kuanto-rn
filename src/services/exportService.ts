@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
-import { fetchHistoricalRates, fetchUsdtHistory } from './rateService';
+import { fetchHistoricalRates, fetchUsdtDailyAverages } from './rateService';
 
 export interface ExportRow {
   date: string;
@@ -27,7 +27,7 @@ export const fetchAndPrepareExportData = async (
 
     const [bcvData, usdtData] = await Promise.all([
       fetchHistoricalRates('all'),
-      fetchUsdtHistory('all'),
+      fetchUsdtDailyAverages('all'),
     ]);
 
     console.log(`[ExportService] Fetched ${bcvData.length} BCV records and ${usdtData.length} USDT records`);

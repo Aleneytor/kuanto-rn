@@ -28,7 +28,7 @@ import { COLORS } from '../theme/colors';
 import { formatCurrency } from '../utils/formatting';
 import {
   fetchHistoricalRates,
-  fetchUsdtHistory,
+  fetchUsdtDailyAverages,
   type HistoryPoint,
 } from '../services/rateService';
 import { fetchAndPrepareExportData, exportToExcel } from '../services/exportService';
@@ -138,7 +138,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
       const fromDate = listFromDateISO();
       const [bcv, usdt] = await Promise.all([
         fetchHistoricalRates('month', fromDate),
-        fetchUsdtHistory('month', fromDate),
+        fetchUsdtDailyAverages('month', fromDate),
       ]);
 
       const unified: Record<string, UnifiedHistoryItem> = {};
