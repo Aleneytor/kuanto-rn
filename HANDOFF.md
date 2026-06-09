@@ -4,19 +4,14 @@
 
 ## ▶️ Por dónde seguir (próxima sesión)
 
-**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel, con caché), **compartir tasa + método de pago** arreglado, **Fuentes** y **Ajustes**. Verificado con `npm run typecheck` + `npx expo export --platform ios`.
+**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (sin lag), **Historial Completo** (lista de 14 días + exportación de rango de fechas a Excel .xlsx de forma nativa) implementada, **Ajustes** con rediseño visual premium de marca.
 
-**Antes de empezar:** `git pull`. **Ojo:** `npx tsc --noEmit` **crashea** por un bug de pila de Node v25; usa el script nuevo **`npm run typecheck`** (aplica `--stack-size=8000`).
+**Antes de empezar:** `git pull`.
 
-**Pendientes (elige uno):**
+**Pendientes prioritarios (siguiente sesión):**
 
-1. **Tutorial de bienvenida (onboarding)** en el primer arranque que lleve al usuario a **cargar sus datos de pago móvil** (`PagoMovilScreen`). Detectar "primera vez" con un flag en AsyncStorage (p. ej. `@onboarding_done`) y abrir la sección `'pago'` o un mini paso a paso. *(Pedido por el usuario.)*
-2. **Notificaciones reales**: hoy el toggle de Ajustes solo guarda la preferencia en AsyncStorage. Implementar con `expo-notifications` (avisos de nueva tasa BCV / movimiento del paralelo). *(Pedido por el usuario.)*
-3. **Vista diaria de USDT en Supabase** para que el **Historial Completo cargue rápido la primera vez**: hoy baja miles de ticks P2P y los promedia en el cliente. Crear una vista/RPC que devuelva el promedio diario ya calculado y consumirla desde `rateService`. Requiere correr SQL en el panel de Supabase (la `anon key` es de solo lectura).
-4. **Ícono y splash** de la app (rebranding) en `app.json`. Assets en el repo web original: `icon.png`, `adaptive-icon.png`, `splash-icon.png`.
-5. **Compartir tasa histórica** desde el calendario (hoy solo consulta).
-
-**Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
+1. **Tutorial de bienvenida (onboarding)**: Mostrar un mini tutorial/guía al abrir la app por primera vez que lleve al usuario a configurar sus datos de pago móvil (`PagoMovilScreen` / sección `'pago'`). Se puede gestionar con un flag persistido en AsyncStorage (p. ej., `@kuanto/onboarding_done`).
+2. **Notificaciones reales**: Implementar notificaciones automáticas/push al publicarse nuevas tasas oficiales o al actualizarse el paralelo mediante `expo-notifications` (el toggle en Ajustes ya está diseñado e integrado a AsyncStorage).
 
 ---
 
