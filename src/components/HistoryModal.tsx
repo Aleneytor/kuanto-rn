@@ -30,6 +30,7 @@ import {
   fetchHistoricalRates,
   fetchUsdtDailyAverages,
   type HistoryPoint,
+  type UsdtHistoryPoint,
 } from '../services/rateService';
 import { fetchAndPrepareExportData, exportToExcel } from '../services/exportService';
 
@@ -61,6 +62,28 @@ interface UnifiedHistoryItem {
   usdt: number | null;
 }
 
+function mergeHistoryRows(
+  bcv: HistoryPoint[],
+  usdt: UsdtHistoryPoint[]
+): UnifiedHistoryItem[] {
+  const unified: Record<string, UnifiedHistoryItem> = {};
+
+  bcv.forEach((item) => {
+    const dateStr = item.date.split('T')[0];
+    unified[dateStr] = { date: dateStr, usd: item.usd, eur: item.eur, usdt: null };
+  });
+
+  usdt.forEach((item) => {
+    if (unified[item.date]) {
+      unified[item.date].usdt = item.usdt;
+    } else {
+      unified[item.date] = { date: item.date, usd: null, eur: null, usdt: item.usdt };
+    }
+  });
+
+  return Object.values(unified).sort((a, b) => b.date.localeCompare(a.date));
+}
+
 export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalProps) {
   // View State: 'list' | 'export'
   const [view, setView] = useState<'list' | 'export'>('list');
@@ -68,6 +91,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
   // Unified history data
   const [historyData, setHistoryData] = useState<UnifiedHistoryItem[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [usdtLoading, setUsdtLoading] = useState(false);
 
   // Export State
   const [startDate, setStartDate] = useState(() => {
@@ -83,6 +107,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
   // Animation states
   const anim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
+  const loadRunRef = useRef(0);
 
   // Sync visibility and trigger native animations
   useEffect(() => {
@@ -98,6 +123,8 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
         useNativeDriver: true,
       }).start();
     } else if (mounted) {
+      loadRunRef.current += 1;
+      setUsdtLoading(false);
       Animated.timing(anim, {
         toValue: 0,
         duration: 240,
@@ -112,12 +139,16 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
   // (tras la animación de apertura) solo si está vencido. Evita el spinner y la
   // espera a Supabase en cada apertura.
   const loadHistory = async () => {
+    const runId = ++loadRunRef.current;
+    const isCurrentRun = () => runId === loadRunRef.current;
+    setUsdtLoading(false);
     let hadCache = false;
     try {
       const raw = await AsyncStorage.getItem(HISTORY_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as { items: UnifiedHistoryItem[]; cachedAt: number };
         if (cached?.items?.length) {
+          if (!isCurrentRun()) return;
           setHistoryData(cached.items);
           setDataLoading(false);
           hadCache = true;
@@ -133,30 +164,28 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
 
     // Refrescar tras la animación de apertura (~300 ms), para no competir con ella.
     await new Promise<void>((resolve) => setTimeout(resolve, 320));
+    if (!isCurrentRun()) return;
 
     try {
       const fromDate = listFromDateISO();
-      const [bcv, usdt] = await Promise.all([
-        fetchHistoricalRates('month', fromDate),
-        fetchUsdtDailyAverages('month', fromDate),
-      ]);
+      const bcv = await fetchHistoricalRates('month', fromDate);
+      if (!isCurrentRun()) return;
 
-      const unified: Record<string, UnifiedHistoryItem> = {};
+      const bcvOnly = mergeHistoryRows(bcv, []);
+      if (!hadCache && bcvOnly.length) {
+        setHistoryData(bcvOnly);
+        setDataLoading(false);
+        AsyncStorage.setItem(
+          HISTORY_CACHE_KEY,
+          JSON.stringify({ items: bcvOnly, cachedAt: 0 })
+        ).catch(() => {});
+      }
 
-      bcv.forEach((item) => {
-        const dateStr = item.date.split('T')[0];
-        unified[dateStr] = { date: dateStr, usd: item.usd, eur: item.eur, usdt: null };
-      });
+      setUsdtLoading(true);
+      const usdt = await fetchUsdtDailyAverages('month', fromDate);
+      if (!isCurrentRun()) return;
 
-      usdt.forEach((item) => {
-        if (unified[item.date]) {
-          unified[item.date].usdt = item.usdt;
-        } else {
-          unified[item.date] = { date: item.date, usd: null, eur: null, usdt: item.usdt };
-        }
-      });
-
-      const sorted = Object.values(unified).sort((a, b) => b.date.localeCompare(a.date));
+      const sorted = mergeHistoryRows(bcv, usdt);
       setHistoryData(sorted);
       AsyncStorage.setItem(
         HISTORY_CACHE_KEY,
@@ -168,7 +197,10 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
         alert('Error al cargar el historial: ' + (error instanceof Error ? error.message : String(error)));
       }
     } finally {
-      setDataLoading(false);
+      if (isCurrentRun()) {
+        setDataLoading(false);
+        setUsdtLoading(false);
+      }
     }
   };
 
@@ -364,7 +396,12 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
                       <Text style={[styles.headerText, { color: COLORS.euroBlue }]}>EUR BCV</Text>
                     </View>
                     <View style={[styles.columnHeader, { flex: 1, alignItems: 'flex-end' }]}>
-                      <Text style={[styles.headerText, { color: COLORS.parallelOrange }]}>USDT</Text>
+                      <View style={styles.usdtHeader}>
+                        {usdtLoading && (
+                          <ActivityIndicator size="small" color={COLORS.parallelOrange} />
+                        )}
+                        <Text style={[styles.headerText, { color: COLORS.parallelOrange }]}>USDT</Text>
+                      </View>
                     </View>
                   </View>
 
@@ -578,6 +615,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     opacity: 0.8,
     letterSpacing: 0.5,
+  },
+  usdtHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
   },
   listContent: {
     paddingBottom: 16,

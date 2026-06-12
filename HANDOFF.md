@@ -4,7 +4,7 @@
 
 ## ▶️ Por dónde seguir (próxima sesión)
 
-**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel .xlsx, con caché y agregación diaria), **Fuentes**, **Ajustes** (rediseño de marca), **compartir tasa + método de pago**, e **ícono + splash de marca**. Verificado con `npm run typecheck` + `npx expo export --platform ios`.
+**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel .xlsx, con caché y agregación diaria), **Fuentes**, **Ajustes** (rediseño de marca), **compartir tasa + método de pago**, **ícono + splash de marca**, y **tutorial de bienvenida** (primer arranque). Verificado con `npm run typecheck` + `npx expo export --platform ios`.
 
 **Antes de empezar:** `git pull`. Nota: `npx tsc --noEmit` crashea por un bug de pila de Node v25 → usá **`npm run typecheck`**.
 
@@ -12,16 +12,21 @@
 
 **Pendientes (elige uno):**
 
-1. **Tutorial de bienvenida (onboarding)**: mini guía al abrir la app por primera vez que lleve a configurar los datos de pago móvil (`PagoMovilScreen` / sección `'pago'`). Flag persistido en AsyncStorage (p. ej., `@kuanto/onboarding_done`).
-2. **Notificaciones reales**: con `expo-notifications` (nueva tasa BCV / movimiento del paralelo). El toggle de Ajustes ya guarda la preferencia en AsyncStorage. Ojo: en Expo Go SDK 54 las locales funcionan, el push remoto necesita un dev build.
-3. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
-4. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
+1. **Notificaciones reales**: con `expo-notifications` (nueva tasa BCV / movimiento del paralelo). El toggle de Ajustes ya guarda la preferencia en AsyncStorage. Ojo: en Expo Go SDK 54 las locales funcionan, el push remoto necesita un dev build.
+2. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
+3. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
 
 **Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
 
 ---
 
 ## 🗓️ Changelog
+
+### Sesión 2026-06-12 — tutorial de bienvenida + carga progresiva del Historial
+
+**Tutorial de bienvenida (onboarding):** `OnboardingModal.tsx` — 3 pasos deslizables (bienvenida, calcula y comparte, datos de pago) con animaciones suaves (fade + scale de entrada y de salida). Al terminar **no** salta a la pantalla de pago: cierra y aparece un **globo flotante** (`CoachMark.tsx`) con flechita apuntando al menú ☰ ("Aquí puedes configurar tus datos de pago"), **no intrusivo** (el resto de la pantalla sigue usable; se va al tocarlo, al abrir el menú o tras ~8 s). Solo en el 1er arranque (flag `@kuanto/onboarding_done_v2` en AsyncStorage; **versionado** para re-mostrarse tras rediseños). Integrado en `HomeScreen`.
+
+**Historial — carga progresiva (cambio en paralelo):** `HistoryModal` muestra **BCV al instante** y carga el **USDT en 2º plano** con un spinner en su columna (`fetchUsdtDailyAverages`), con cancelación de cargas viejas (`loadRunRef`) y helper `mergeHistoryRows`.
 
 ### Sesión 2026-06-09 — Historial rápido (agregación en Supabase)
 

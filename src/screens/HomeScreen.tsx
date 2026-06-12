@@ -24,6 +24,8 @@ import { HeaderMenu, type MenuKey } from '../components/HeaderMenu';
 import { SectionModal } from '../components/SectionModal';
 import { CalendarModal } from '../components/CalendarModal';
 import { HistoryModal } from '../components/HistoryModal';
+import { OnboardingModal } from '../components/OnboardingModal';
+import { CoachMark } from '../components/CoachMark';
 import { SourcesScreen } from './SourcesScreen';
 import { PagoMovilScreen } from './PagoMovilScreen';
 import { type PaymentMethod } from '../constants/banks';
@@ -40,6 +42,10 @@ const SECTION_TITLES: Record<MenuKey, string> = {
   history: 'Historial completo',
 };
 
+// Versionada: al rediseñar el tutorial se incrementa el sufijo para que vuelva a
+// mostrarse una vez a quienes ya completaron una versión anterior.
+const ONBOARDING_KEY = '@kuanto/onboarding_done_v2';
+
 export function HomeScreen() {
   const { rates, loading, isStale, error, refresh } = useRates();
   const [refreshing, setRefreshing] = useState(false);
@@ -52,6 +58,8 @@ export function HomeScreen() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
   const [pagoEditingId, setPagoEditingId] = useState<string | null>(null);
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [coachVisible, setCoachVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   const scrollRef = useRef<any>(null);
@@ -60,6 +68,15 @@ export function HomeScreen() {
 
   useEffect(() => {
     loadPaymentMethods();
+  }, []);
+
+  // Tutorial de bienvenida: solo en el primer arranque.
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then((done) => {
+        if (!done) setOnboardingVisible(true);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -84,6 +101,14 @@ export function HomeScreen() {
     setSection(null);
     setPagoInitialMode('list');
     setPagoEditingId(null);
+  };
+
+  const finishOnboarding = () => {
+    AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
+    setOnboardingVisible(false);
+    // En vez de saltar a la pantalla de pago, mostramos un globo discreto que
+    // apunta al menú (☰) donde se configuran los datos.
+    setCoachVisible(true);
   };
 
   const onRefresh = async () => {
@@ -152,7 +177,14 @@ export function HomeScreen() {
             resizeMode="contain"
             accessibilityLabel="Kuanto"
           />
-          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.iconBtn}>
+          <Pressable
+            onPress={() => {
+              setMenuOpen(true);
+              setCoachVisible(false);
+            }}
+            hitSlop={8}
+            style={styles.iconBtn}
+          >
             <Menu size={22} color={COLORS.text} />
           </Pressable>
         </View>
@@ -332,6 +364,14 @@ export function HomeScreen() {
           />
         )}
       </SectionModal>
+
+      <OnboardingModal visible={onboardingVisible} onClose={finishOnboarding} />
+
+      <CoachMark
+        visible={coachVisible}
+        onDismiss={() => setCoachVisible(false)}
+        topOffset={insets.top + 56}
+      />
     </View>
   );
 }
