@@ -24,7 +24,6 @@ import { HeaderMenu, type MenuKey } from '../components/HeaderMenu';
 import { SectionModal } from '../components/SectionModal';
 import { CalendarModal } from '../components/CalendarModal';
 import { HistoryModal } from '../components/HistoryModal';
-import { OnboardingModal } from '../components/OnboardingModal';
 import { CoachMark } from '../components/CoachMark';
 import { SourcesScreen } from './SourcesScreen';
 import { PagoMovilScreen } from './PagoMovilScreen';
@@ -44,7 +43,7 @@ const SECTION_TITLES: Record<MenuKey, string> = {
 
 // Versionada: al rediseñar el tutorial se incrementa el sufijo para que vuelva a
 // mostrarse una vez a quienes ya completaron una versión anterior.
-const ONBOARDING_KEY = '@kuanto/onboarding_done_v2';
+const ONBOARDING_KEY = '@kuanto/onboarding_done_v3';
 
 export function HomeScreen() {
   const { rates, loading, isStale, error, refresh } = useRates();
@@ -58,8 +57,7 @@ export function HomeScreen() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
   const [pagoEditingId, setPagoEditingId] = useState<string | null>(null);
-  const [onboardingVisible, setOnboardingVisible] = useState(false);
-  const [coachVisible, setCoachVisible] = useState(false);
+  const [onboardingActive, setOnboardingActive] = useState(false);
   const insets = useSafeAreaInsets();
 
   const scrollRef = useRef<any>(null);
@@ -70,11 +68,11 @@ export function HomeScreen() {
     loadPaymentMethods();
   }, []);
 
-  // Tutorial de bienvenida: solo en el primer arranque.
+  // Tutorial flotante (coach-marks): solo en el primer arranque.
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY)
       .then((done) => {
-        if (!done) setOnboardingVisible(true);
+        if (!done) setOnboardingActive(true);
       })
       .catch(() => {});
   }, []);
@@ -105,10 +103,7 @@ export function HomeScreen() {
 
   const finishOnboarding = () => {
     AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
-    setOnboardingVisible(false);
-    // En vez de saltar a la pantalla de pago, mostramos un globo discreto que
-    // apunta al menú (☰) donde se configuran los datos.
-    setCoachVisible(true);
+    setOnboardingActive(false);
   };
 
   const onRefresh = async () => {
@@ -142,9 +137,34 @@ export function HomeScreen() {
 
   const usdValue = useFuture ? rates!.nextRates!.usd : rates?.bcv ?? 0;
   const eurValue = useFuture ? rates!.nextRates!.eur : rates?.euro ?? 0;
+  const usdChange = useFuture
+    ? (rates?.nextRates && rates.bcv ? ((rates.nextRates.usd - rates.bcv) / rates.bcv) * 100 : 0)
+    : (rates?.usdChange ?? 0);
+  const eurChange = useFuture
+    ? (rates?.nextRates && rates.euro ? ((rates.nextRates.eur - rates.euro) / rates.euro) * 100 : 0)
+    : (rates?.eurChange ?? 0);
   const bcvUpdate = useFuture
     ? `Próxima · ${rates!.nextRates!.date}`
     : rates?.lastUpdate ?? '—';
+
+  const displayRates = rates
+    ? {
+        ...rates,
+        bcv: usdValue,
+        euro: eurValue,
+        usdChange,
+        eurChange,
+        lastUpdate: bcvUpdate,
+      }
+    : null;
+  const futureHistoryPoint =
+    useFuture && rates?.nextRates
+      ? {
+          date: rates.nextRates.rawDate,
+          usd: rates.nextRates.usd,
+          eur: rates.nextRates.eur,
+        }
+      : null;
 
   return (
     <View style={styles.root}>
@@ -177,14 +197,7 @@ export function HomeScreen() {
             resizeMode="contain"
             accessibilityLabel="Kuanto"
           />
-          <Pressable
-            onPress={() => {
-              setMenuOpen(true);
-              setCoachVisible(false);
-            }}
-            hitSlop={8}
-            style={styles.iconBtn}
-          >
+          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.iconBtn}>
             <Menu size={22} color={COLORS.text} />
           </Pressable>
         </View>
@@ -270,7 +283,7 @@ export function HomeScreen() {
                 label="Tasa BCV"
                 code="USD"
                 value={usdValue}
-                change={useFuture ? (rates?.nextRates && rates.bcv ? ((rates.nextRates.usd - rates.bcv) / rates.bcv) * 100 : 0) : (rates?.usdChange ?? 0)}
+                change={usdChange}
                 accent={COLORS.bcvGreen}
                 icon={DollarSign}
                 update={bcvUpdate}
@@ -286,7 +299,7 @@ export function HomeScreen() {
                 label="Tasa BCV"
                 code="EUR"
                 value={eurValue}
-                change={useFuture ? (rates?.nextRates && rates.euro ? ((rates.nextRates.eur - rates.euro) / rates.euro) * 100 : 0) : (rates?.eurChange ?? 0)}
+                change={eurChange}
                 accent={COLORS.euroBlue}
                 icon={Euro}
                 update={bcvUpdate}
@@ -315,9 +328,9 @@ export function HomeScreen() {
 
             <Text style={styles.sectionLabel}>Historial de tasas</Text>
 
-            <HistorySection />
+            <HistorySection futureRates={futureHistoryPoint} />
 
-            {rates && <CurrencyGap rates={rates} />}
+            {displayRates && <CurrencyGap rates={displayRates} isFuture={useFuture} />}
 
             <Text style={styles.disclaimer}>
               Datos con fines informativos. Fuente oficial: Banco Central de Venezuela (BCV) y
@@ -337,9 +350,14 @@ export function HomeScreen() {
       <HeaderMenu
         visible={menuOpen}
         topOffset={insets.top + 52}
-        onClose={() => setMenuOpen(false)}
+        highlightKey={onboardingActive ? 'pago' : undefined}
+        onClose={() => {
+          setMenuOpen(false);
+          if (onboardingActive) finishOnboarding();
+        }}
         onSelect={(key) => {
           setMenuOpen(false);
+          if (onboardingActive) finishOnboarding();
           if (key === 'history') {
             setHistoryOpen(true);
           } else {
@@ -365,12 +383,20 @@ export function HomeScreen() {
         )}
       </SectionModal>
 
-      <OnboardingModal visible={onboardingVisible} onClose={finishOnboarding} />
-
+      {/* Tutorial flotante: paso 1 (menú cerrado) apunta al ☰; paso 2 (menú abierto) a "Mis datos". */}
       <CoachMark
-        visible={coachVisible}
-        onDismiss={() => setCoachVisible(false)}
+        visible={onboardingActive && !menuOpen}
+        onDismiss={finishOnboarding}
         topOffset={insets.top + 56}
+        text="Toca el menú ☰ para añadir tus datos de pago"
+        autoDismissMs={9000}
+      />
+      <CoachMark
+        visible={onboardingActive && menuOpen}
+        onDismiss={finishOnboarding}
+        topOffset={insets.top + 214}
+        text="Elige 'Mis datos' para guardar tu pago móvil"
+        autoDismissMs={0}
       />
     </View>
   );

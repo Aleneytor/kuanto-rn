@@ -8,6 +8,9 @@ interface Props {
   onDismiss: () => void;
   /** Distancia desde arriba (normalmente insets.top + alto del header). */
   topOffset: number;
+  text: string;
+  /** ms hasta autocerrar; 0 = no autocerrar. */
+  autoDismissMs?: number;
 }
 
 /**
@@ -15,7 +18,7 @@ interface Props {
  * apuntando hacia él. No intrusivo: el resto de la pantalla sigue siendo usable
  * (`box-none`). Se descarta al tocarlo o tras unos segundos.
  */
-export function CoachMark({ visible, onDismiss, topOffset }: Props) {
+export function CoachMark({ visible, onDismiss, topOffset, text, autoDismissMs = 8000 }: Props) {
   const anim = useRef(new Animated.Value(0)).current; // entrada (fade + slide)
   const bob = useRef(new Animated.Value(0)).current; // flotación continua
   const [mounted, setMounted] = useState(visible);
@@ -39,9 +42,9 @@ export function CoachMark({ visible, onDismiss, topOffset }: Props) {
       );
       loop.start();
 
-      const t = setTimeout(onDismiss, 8000);
+      const t = autoDismissMs > 0 ? setTimeout(onDismiss, autoDismissMs) : undefined;
       return () => {
-        clearTimeout(t);
+        if (t) clearTimeout(t);
         loop.stop();
       };
     }
@@ -73,7 +76,7 @@ export function CoachMark({ visible, onDismiss, topOffset }: Props) {
         <View style={styles.arrow} />
         <Pressable onPress={onDismiss} style={styles.bubble}>
           <Smartphone size={18} color="#0a1a0e" />
-          <Text style={styles.text}>Aquí puedes configurar tus datos de pago</Text>
+          <Text style={styles.text}>{text}</Text>
         </Pressable>
       </Animated.View>
     </View>

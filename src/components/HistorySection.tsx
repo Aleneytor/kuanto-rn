@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Activity } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
@@ -23,7 +23,15 @@ const PERIODS: { key: HistoryPeriod; label: string }[] = [
   { key: 'year', label: 'Año' },
 ];
 
-export function HistorySection() {
+interface Props {
+  futureRates?: {
+    date: string;
+    usd: number;
+    eur: number;
+  } | null;
+}
+
+export function HistorySection({ futureRates }: Props) {
   const [series, setSeries] = useState<HistorySeries>('usd');
   const [period, setPeriod] = useState<HistoryPeriod>('month');
   const [data, setData] = useState<HistoryEntry[]>([]);
@@ -44,8 +52,18 @@ export function HistorySection() {
     };
   }, [series, period]);
 
-  const last = data.length ? data[data.length - 1].value : 0;
-  const first = data.length ? data[0].value : 0;
+  const displayData = useMemo(() => {
+    if (!futureRates || series === 'parallel') return data;
+
+    const futureValue = series === 'usd' ? futureRates.usd : futureRates.eur;
+    return [
+      ...data.filter((point) => point.date !== futureRates.date),
+      { date: futureRates.date, value: futureValue },
+    ].sort((a, b) => a.date.localeCompare(b.date));
+  }, [data, futureRates, series]);
+
+  const last = displayData.length ? displayData[displayData.length - 1].value : 0;
+  const first = displayData.length ? displayData[0].value : 0;
   const change = first > 0 ? ((last - first) / first) * 100 : 0;
   const changeColor = change >= 0 ? COLORS.positive : COLORS.negative;
 
@@ -75,7 +93,7 @@ export function HistorySection() {
 
       <View style={styles.valueRow}>
         <Text style={styles.value}>Bs {formatCurrency(last)}</Text>
-        {data.length >= 2 && (
+        {displayData.length >= 2 && (
           <Text style={[styles.change, { color: changeColor }]}>
             {formatChange(change)} · {periodLabel}
           </Text>
@@ -88,7 +106,7 @@ export function HistorySection() {
             <ActivityIndicator color={accent} />
           </View>
         ) : (
-          <HistoryChart data={data} color={accent} height={180} />
+          <HistoryChart data={displayData} color={accent} height={180} />
         )}
       </View>
 

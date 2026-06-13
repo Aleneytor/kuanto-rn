@@ -92,6 +92,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
   const [historyData, setHistoryData] = useState<UnifiedHistoryItem[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [usdtLoading, setUsdtLoading] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
 
   // Export State
   const [startDate, setStartDate] = useState(() => {
@@ -112,18 +113,32 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
   // Sync visibility and trigger native animations
   useEffect(() => {
     if (visible) {
+      loadRunRef.current += 1;
+      const openRunId = loadRunRef.current;
+      anim.stopAnimation();
+      anim.setValue(0);
       setMounted(true);
       setView('list');
       setExportLoading(false);
       setProgressStep('');
-      loadHistory();
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      setContentReady(false);
+      setDataLoading(true);
+      setUsdtLoading(false);
+      requestAnimationFrame(() => {
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished && openRunId === loadRunRef.current) {
+            setContentReady(true);
+            loadHistory();
+          }
+        });
+      });
     } else if (mounted) {
       loadRunRef.current += 1;
+      setContentReady(false);
       setUsdtLoading(false);
       Animated.timing(anim, {
         toValue: 0,
@@ -332,6 +347,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
+      hardwareAccelerated
     >
       <View style={styles.overlay}>
         {/* Backdrop */}
@@ -377,7 +393,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
           {/* Content */}
           <View style={styles.body}>
             {view === 'list' ? (
-              dataLoading ? (
+              !contentReady || dataLoading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={COLORS.bcvGreen} />
                   <Text style={styles.loadingText}>Cargando historial...</Text>
@@ -485,7 +501,7 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
                 onPress={() => setView('export')}
                 style={[styles.downloadButton, { backgroundColor: COLORS.bcvGreen }]}
                 activeOpacity={0.8}
-                disabled={dataLoading}
+                disabled={!contentReady || dataLoading}
               >
                 <Download size={18} color="#0a1a0e" style={{ marginRight: 8 }} />
                 <Text style={styles.downloadButtonText}>Descargar Historial en Excel</Text>

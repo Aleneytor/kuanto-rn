@@ -22,11 +22,13 @@
 
 ## 🗓️ Changelog
 
-### Sesión 2026-06-12 — tutorial de bienvenida + carga progresiva del Historial
+### Sesión 2026-06-12 — tutorial flotante (coach-marks) + carga progresiva del Historial
 
-**Tutorial de bienvenida (onboarding):** `OnboardingModal.tsx` — 3 pasos deslizables (bienvenida, calcula y comparte, datos de pago) con animaciones suaves (fade + scale de entrada y de salida). Al terminar **no** salta a la pantalla de pago: cierra y aparece un **globo flotante** (`CoachMark.tsx`) con flechita apuntando al menú ☰ ("Aquí puedes configurar tus datos de pago"), **no intrusivo** (el resto de la pantalla sigue usable; se va al tocarlo, al abrir el menú o tras ~8 s). Solo en el 1er arranque (flag `@kuanto/onboarding_done_v2` en AsyncStorage; **versionado** para re-mostrarse tras rediseños). Integrado en `HomeScreen`.
+**Tutorial (onboarding) — solo coach-marks, sin modal de bienvenida:** la app abre directo a las tasas (se **borró `OnboardingModal.tsx`**). En el 1er arranque, un **globo flotante** (`CoachMark.tsx`) apunta al menú ☰ ("Toca el menú para añadir tus datos de pago"); al **abrir el menú**, el ítem **"Mis datos"** se resalta (verde + pill "Empieza aquí", vía `HeaderMenu` con prop `highlightKey`) y un 2º globo lo señala. **No intrusivo**: la pantalla sigue usable; se cierra al tocar un globo, elegir una opción del menú, cerrar el menú, o por tiempo (paso 1). Flag versionado **`@kuanto/onboarding_done_v3`**. `CoachMark` admite `text` y `autoDismissMs`.
 
 **Historial — carga progresiva (cambio en paralelo):** `HistoryModal` muestra **BCV al instante** y carga el **USDT en 2º plano** con un spinner en su columna (`fetchUsdtDailyAverages`), con cancelación de cargas viejas (`loadRunRef`) y helper `mergeHistoryRows`.
+
+**Tasas futuras (cambio en paralelo):** Home/Historial/Brecha contemplan la próxima tasa BCV ya publicada (`displayRates` en `HomeScreen`, `HistorySection` con `futureRates`, `CurrencyGap` con `isFuture`).
 
 ### Sesión 2026-06-09 — Historial rápido (agregación en Supabase)
 

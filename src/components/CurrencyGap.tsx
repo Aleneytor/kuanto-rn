@@ -44,16 +44,19 @@ function GapCard({ label1, label2, value1, value2, color }: GapCardProps) {
 
 interface CurrencyGapProps {
   rates: Rates;
+  isFuture?: boolean;
 }
 
-export function CurrencyGap({ rates }: CurrencyGapProps) {
+export function CurrencyGap({ rates, isFuture = false }: CurrencyGapProps) {
   if (!rates || !rates.bcv || !rates.euro || !rates.parallel) return null;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Layers size={18} color={COLORS.textSecondary} />
-        <Text style={styles.headerTitle}>Brecha de hoy</Text>
+        <Text style={styles.headerTitle}>
+          {isFuture ? 'Brecha con próxima tasa' : 'Brecha de hoy'}
+        </Text>
       </View>
 
       <View style={styles.cardsContainer}>

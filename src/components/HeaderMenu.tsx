@@ -17,6 +17,8 @@ interface Props {
   topOffset: number;
   onClose: () => void;
   onSelect: (key: MenuKey) => void;
+  /** Resalta un ítem (tutorial): fondo verde + pill "Empieza aquí". */
+  highlightKey?: MenuKey;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * la vista (no como Modal nativo) para que cerrarlo sea instantáneo y no retrase
  * la apertura de la pantalla destino (que sí es un Modal).
  */
-export function HeaderMenu({ visible, topOffset, onClose, onSelect }: Props) {
+export function HeaderMenu({ visible, topOffset, onClose, onSelect, highlightKey }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -48,20 +50,31 @@ export function HeaderMenu({ visible, topOffset, onClose, onSelect }: Props) {
       <Animated.View
         style={[styles.menu, { top: topOffset, opacity: anim, transform: [{ translateY }] }]}
       >
-        {ITEMS.map((it, i) => (
-          <Pressable
-            key={it.key}
-            style={({ pressed }) => [
-              styles.item,
-              i > 0 && styles.itemBorderTop,
-              pressed && styles.itemPressed,
-            ]}
-            onPress={() => onSelect(it.key)}
-          >
-            <it.icon size={19} color={COLORS.text} />
-            <Text style={styles.itemText}>{it.label}</Text>
-          </Pressable>
-        ))}
+        {ITEMS.map((it, i) => {
+          const highlighted = it.key === highlightKey;
+          return (
+            <Pressable
+              key={it.key}
+              style={({ pressed }) => [
+                styles.item,
+                i > 0 && styles.itemBorderTop,
+                highlighted && styles.itemHighlight,
+                pressed && styles.itemPressed,
+              ]}
+              onPress={() => onSelect(it.key)}
+            >
+              <it.icon size={19} color={highlighted ? COLORS.bcvGreen : COLORS.text} />
+              <Text style={[styles.itemText, highlighted && styles.itemTextHighlight]}>
+                {it.label}
+              </Text>
+              {highlighted && (
+                <View style={styles.hintPill}>
+                  <Text style={styles.hintPillText}>Empieza aquí</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
       </Animated.View>
     </View>
   );
@@ -97,9 +110,28 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.glass,
   },
   itemText: {
+    flex: 1,
     color: COLORS.text,
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 14,
+  },
+  itemTextHighlight: {
+    color: COLORS.bcvGreen,
+  },
+  itemHighlight: {
+    backgroundColor: COLORS.bcvGreen + '14',
+  },
+  hintPill: {
+    backgroundColor: COLORS.bcvGreen,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 8,
+  },
+  hintPillText: {
+    color: '#0a1a0e',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });
