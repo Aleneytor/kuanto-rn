@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Layers, TrendingUp } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { formatCurrency } from '../utils/formatting';
 import { type Rates } from '../services/rateService';
 
@@ -20,19 +21,24 @@ function GapCard({ label1, label2, value1, value2, color }: GapCardProps) {
 
   return (
     <View style={styles.gapCard}>
-      {/* Premium Glow Effect */}
-      <View style={[styles.glowCircle, { backgroundColor: color }]} />
-
       <View style={styles.topRow}>
         <View style={styles.labelContainer}>
+          <View style={[styles.pairAccent, { backgroundColor: color }]} />
           <Text style={styles.assetLabel}>{label1}</Text>
           <Text style={styles.separator}>↔</Text>
           <Text style={styles.assetLabel}>{label2}</Text>
         </View>
 
-        <View style={styles.badge}>
-          <TrendingUp size={13} color={COLORS.positive} strokeWidth={2.5} />
-          <Text style={styles.badgeText}>+{percent.toFixed(2).replace('.', ',')}%</Text>
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: color + '14', borderColor: color + '33' },
+          ]}
+        >
+          <TrendingUp size={13} color={color} strokeWidth={2.5} />
+          <Text style={[styles.badgeText, { color }]}>
+            +{percent.toFixed(2).replace('.', ',')}%
+          </Text>
         </View>
       </View>
 
@@ -102,11 +108,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerTitle: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 14,
-    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.2,
   },
   cardsContainer: {
     gap: 12,
@@ -131,15 +137,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  glowCircle: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    opacity: 0.08,
-  },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -151,10 +148,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  pairAccent: {
+    width: 3,
+    height: 20,
+    borderRadius: 3,
+    marginRight: 3,
+  },
   assetLabel: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.text,
     fontSize: 14,
-    fontWeight: '700',
   },
   separator: {
     color: COLORS.textSecondary,
@@ -164,8 +167,6 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.positive + '1A',
-    borderColor: COLORS.positive + '33',
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -173,18 +174,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badgeText: {
-    color: COLORS.positive,
     fontSize: 11,
     fontWeight: '700',
   },
   diffText: {
+    fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     fontSize: 12,
     marginBottom: 2,
     opacity: 0.7,
   },
   diffValue: {
+    fontFamily: FONTS.bold,
     fontSize: 20,
-    fontWeight: '800',
   },
 });

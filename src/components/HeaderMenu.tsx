@@ -1,14 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Database, History, Settings, Smartphone } from 'lucide-react-native';
+import { Settings, Smartphone } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 
-export type MenuKey = 'fuentes' | 'pago' | 'ajustes' | 'history';
+export type MenuKey = 'pago' | 'ajustes';
 
 const ITEMS: { key: MenuKey; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }[] = [
-  { key: 'fuentes', label: 'Fuentes', icon: Database },
   { key: 'pago', label: 'Mis datos', icon: Smartphone },
-  { key: 'history', label: 'Historial completo', icon: History },
   { key: 'ajustes', label: 'Ajustes', icon: Settings },
 ];
 

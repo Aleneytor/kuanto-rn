@@ -1,8 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Keyboard,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { FakeCurrencyInput } from 'react-native-currency-input';
 import {
+  ArrowLeftRight,
   ArrowDownRight,
   ArrowUpRight,
   Check,
@@ -12,6 +24,7 @@ import {
   Share2,
 } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { formatChange, formatCurrency } from '../utils/formatting';
 import { PaymentSelectionModal } from './PaymentSelectionModal';
 import { type PaymentMethod } from '../constants/banks';
@@ -31,6 +44,11 @@ interface RateCardProps {
   onToggle: () => void;
   onCalcFocus?: () => void;
   paymentMethods: PaymentMethod[];
+  futureNotice?: {
+    label: string;
+    prefix: string;
+    dateLabel: string;
+  };
 }
 
 export function RateCard({
@@ -45,16 +63,19 @@ export function RateCard({
   onToggle,
   onCalcFocus,
   paymentMethods,
+  futureNotice,
 }: RateCardProps) {
   const anim = useRef(new Animated.Value(0)).current;
   const [contentHeight, setContentHeight] = useState(0);
+  const foreignInputRef = useRef<TextInput>(null);
+  const bsInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    Animated.spring(anim, {
+    Animated.timing(anim, {
       toValue: expanded ? 1 : 0,
+      duration: expanded ? 320 : 240,
+      easing: expanded ? Easing.out(Easing.cubic) : Easing.inOut(Easing.cubic),
       useNativeDriver: false,
-      friction: 11,
-      tension: 70,
     }).start();
   }, [expanded, anim]);
 
@@ -66,6 +87,18 @@ export function RateCard({
     () => anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }),
     [anim],
   );
+  const contentOpacity = useMemo(
+    () => anim.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0.72, 1] }),
+    [anim],
+  );
+  const contentTranslateY = useMemo(
+    () => anim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }),
+    [anim],
+  );
+  const contentScale = useMemo(
+    () => anim.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }),
+    [anim],
+  );
 
   const isUp = change >= 0;
   const changeColor = isUp ? COLORS.positive : COLORS.negative;
@@ -73,14 +106,11 @@ export function RateCard({
 
   const [amount, setAmount] = useState<number | null>(1);
   const [source, setSource] = useState<Source>('foreign');
-  // `touched` distingue el valor por defecto (1,00) de un monto ya escrito por el usuario.
-  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     if (expanded) {
       setSource('foreign');
       setAmount(1);
-      setTouched(false);
     } else {
       Keyboard.dismiss();
     }
@@ -90,19 +120,23 @@ export function RateCard({
     source === 'foreign' ? amount : amount != null && value > 0 ? amount / value : null;
   const bsValue = source === 'bs' ? amount : amount != null ? amount * value : null;
 
-  // Al enfocar: si aún es el valor por defecto, se limpia para escribir directo.
-  // Si ya hay un monto escrito, se conserva (solo cambia el campo activo).
   const focusForeign = () => {
+    if (source !== 'foreign') setAmount(foreignValue);
     setSource('foreign');
-    if (!touched) setAmount(null);
-    else if (source !== 'foreign') setAmount(foreignValue);
     onCalcFocus?.();
   };
   const focusBs = () => {
+    if (source !== 'bs') setAmount(bsValue);
     setSource('bs');
-    if (!touched) setAmount(null);
-    else if (source !== 'bs') setAmount(bsValue);
     onCalcFocus?.();
+  };
+  const focusForeignInput = () => {
+    focusForeign();
+    foreignInputRef.current?.focus();
+  };
+  const focusBsInput = () => {
+    focusBs();
+    bsInputRef.current?.focus();
   };
 
   const [copied, setCopied] = useState<Source | null>(null);
@@ -116,7 +150,6 @@ export function RateCard({
   const reset = () => {
     setSource('foreign');
     setAmount(1);
-    setTouched(false);
   };
 
   const [selectionModalVisible, setSelectionModalVisible] = useState(false);
@@ -236,6 +269,14 @@ export function RateCard({
           <Text style={[styles.bsSuffix, { color: accent }]}>Bs.</Text>
         </View>
 
+        {futureNotice && (
+          <View style={styles.futureNotice}>
+            <Text style={[styles.futureNoticeLabel, { color: accent }]}>
+              {futureNotice.label}
+            </Text>
+          </View>
+        )}
+
         {/* Update + chevron */}
         <View style={styles.updateRow}>
           <Text style={styles.update}>Actualizado: {update}</Text>
@@ -246,9 +287,12 @@ export function RateCard({
       </Pressable>
 
       {/* Calculadora desplegable */}
-      <Animated.View style={[styles.calcClip, { height, opacity: anim }]}>
-        <View
-          style={styles.calcMeasure}
+      <Animated.View style={[styles.calcClip, { height, opacity: contentOpacity }]}>
+        <Animated.View
+          style={[
+            styles.calcMeasure,
+            { transform: [{ translateY: contentTranslateY }, { scale: contentScale }] },
+          ]}
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
             if (h > 0 && Math.abs(h - contentHeight) > 1) setContentHeight(h);
@@ -260,28 +304,48 @@ export function RateCard({
             {/* Divisa arriba */}
             <View style={styles.calcRow}>
               <Text style={styles.calcUnit}>{code}</Text>
-              <FakeCurrencyInput
-                value={foreignValue}
-                onChangeValue={(v) => {
-                  setSource('foreign');
-                  setAmount(v);
-                  setTouched(true);
-                }}
-                onFocus={focusForeign}
-                precision={2}
-                delimiter="."
-                separator=","
-                minValue={0}
-                placeholder="0,00"
-                placeholderTextColor={COLORS.textSecondary}
-                caretColor={accent}
-                keyboardType="number-pad"
-                containerStyle={styles.calcInputContainer}
-                style={[
-                  styles.calcInput,
-                  { color: source === 'foreign' ? COLORS.text : accent },
+              <Pressable
+                onPress={focusForeignInput}
+                onLongPress={focusForeignInput}
+                delayLongPress={120}
+                style={({ pressed }) => [
+                  styles.calcInputPressable,
+                  pressed ? styles.calcInputPressed : null,
                 ]}
-              />
+              >
+                <FakeCurrencyInput
+                  ref={foreignInputRef}
+                  value={foreignValue}
+                  onChangeValue={(v) => {
+                    setSource('foreign');
+                    setAmount(v);
+                  }}
+                  onFocus={focusForeign}
+                  precision={2}
+                  delimiter="."
+                  separator=","
+                  minValue={0}
+                  placeholder="0,00"
+                  placeholderTextColor={COLORS.textSecondary}
+                  caretColor={accent}
+                  contextMenuHidden
+                  disableKeyboardShortcuts
+                  selectTextOnFocus={false}
+                  selectionColor={accent}
+                  autoComplete="off"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  textContentType="none"
+                  importantForAutofill="no"
+                  pointerEvents="none"
+                  keyboardType="number-pad"
+                  containerStyle={styles.calcInputContainer}
+                  style={[
+                    styles.calcInput,
+                    { color: source === 'foreign' ? COLORS.text : accent },
+                  ]}
+                />
+              </Pressable>
               <Pressable onPress={() => copyValue('foreign')} hitSlop={8} style={styles.copyBtn}>
                 {copied === 'foreign' ? (
                   <Check size={18} color={accent} />
@@ -291,37 +355,59 @@ export function RateCard({
               </Pressable>
             </View>
 
-            <View style={styles.rateHintRow}>
-              <View style={styles.rateHintLine} />
-              <Text style={styles.rateHint}>1 {code} = Bs {formatCurrency(value)}</Text>
-              <View style={styles.rateHintLine} />
+            <View style={styles.swapRow}>
+              <View style={styles.swapLine} />
+              <View style={[styles.swapButton, { borderColor: accent + '40' }]}>
+                <ArrowLeftRight size={15} color={COLORS.textSecondary} />
+              </View>
+              <View style={styles.swapLine} />
             </View>
 
             {/* Bolívares abajo */}
             <View style={styles.calcRow}>
-              <Text style={styles.calcUnit}>Bs</Text>
-              <FakeCurrencyInput
-                value={bsValue}
-                onChangeValue={(v) => {
-                  setSource('bs');
-                  setAmount(v);
-                  setTouched(true);
-                }}
-                onFocus={focusBs}
-                precision={2}
-                delimiter="."
-                separator=","
-                minValue={0}
-                placeholder="0,00"
-                placeholderTextColor={COLORS.textSecondary}
-                caretColor={accent}
-                keyboardType="number-pad"
-                containerStyle={styles.calcInputContainer}
-                style={[
-                  styles.calcInput,
-                  { color: source === 'bs' ? COLORS.text : accent },
+              <Text style={styles.calcUnit}>VES</Text>
+              <Pressable
+                onPress={focusBsInput}
+                onLongPress={focusBsInput}
+                delayLongPress={120}
+                style={({ pressed }) => [
+                  styles.calcInputPressable,
+                  pressed ? styles.calcInputPressed : null,
                 ]}
-              />
+              >
+                <FakeCurrencyInput
+                  ref={bsInputRef}
+                  value={bsValue}
+                  onChangeValue={(v) => {
+                    setSource('bs');
+                    setAmount(v);
+                  }}
+                  onFocus={focusBs}
+                  precision={2}
+                  delimiter="."
+                  separator=","
+                  minValue={0}
+                  placeholder="0,00"
+                  placeholderTextColor={COLORS.textSecondary}
+                  caretColor={accent}
+                  contextMenuHidden
+                  disableKeyboardShortcuts
+                  selectTextOnFocus={false}
+                  selectionColor={accent}
+                  autoComplete="off"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  textContentType="none"
+                  importantForAutofill="no"
+                  pointerEvents="none"
+                  keyboardType="number-pad"
+                  containerStyle={styles.calcInputContainer}
+                  style={[
+                    styles.calcInput,
+                    { color: source === 'bs' ? COLORS.text : accent },
+                  ]}
+                />
+              </Pressable>
               <Pressable onPress={() => copyValue('bs')} hitSlop={8} style={styles.copyBtn}>
                 {copied === 'bs' ? (
                   <Check size={18} color={accent} />
@@ -330,20 +416,20 @@ export function RateCard({
                 )}
               </Pressable>
             </View>
-
-            <View style={styles.actionsDivider} />
-            <View style={styles.actionsRow}>
-              <Pressable onPress={reset} style={styles.actionBtn} hitSlop={6}>
-                <RotateCcw size={15} color={COLORS.textSecondary} />
-                <Text style={styles.actionText}>Reiniciar</Text>
-              </Pressable>
-              <Pressable onPress={share} style={styles.actionBtn} hitSlop={6}>
-                <Share2 size={15} color={COLORS.textSecondary} />
-                <Text style={styles.actionText}>Compartir</Text>
-              </Pressable>
-            </View>
           </View>
-        </View>
+
+          <View style={styles.actionsRow}>
+            <Pressable onPress={reset} style={styles.actionBtn} hitSlop={6}>
+              <RotateCcw size={16} color={COLORS.textSecondary} />
+              <Text style={styles.actionText}>Reiniciar</Text>
+            </Pressable>
+            <View style={styles.actionsDivider} />
+            <Pressable onPress={share} style={styles.actionBtn} hitSlop={6}>
+              <Share2 size={16} color={accent} />
+              <Text style={[styles.actionText, { color: accent }]}>Compartir</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       </Animated.View>
 
       <PaymentSelectionModal
@@ -395,9 +481,9 @@ const styles = StyleSheet.create({
   cardLabel: {
     flex: 1,
     color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    letterSpacing: 0.1,
   },
   topRight: {
     flexDirection: 'row',
@@ -414,8 +500,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   changeText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '700',
   },
   shareBtn: {
     width: 34,
@@ -433,16 +519,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   value: {
-    fontSize: 44,
-    fontWeight: '800',
-    letterSpacing: -0.8,
+    fontFamily: FONTS.bold,
+    fontSize: 38,
+    letterSpacing: 0,
+    lineHeight: 44,
   },
   bsSuffix: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginLeft: 8,
-    marginBottom: 2,
-    opacity: 0.75,
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    marginLeft: 3,
+    marginBottom: 5,
+  },
+  futureNotice: {
+    marginTop: -7,
+    marginBottom: 9,
+  },
+  futureNoticeLabel: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    lineHeight: 17,
   },
   updateRow: {
     flexDirection: 'row',
@@ -450,8 +545,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   update: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
   },
   calcClip: {
     overflow: 'hidden',
@@ -465,69 +561,91 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: COLORS.divider,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 12,
   },
   calcBox: {
-    backgroundColor: COLORS.glass,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: 'rgba(0,0,0,0.16)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.035)',
+    paddingHorizontal: 18,
+    paddingVertical: 15,
   },
   calcRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    minHeight: 42,
   },
   calcUnit: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 14,
+    letterSpacing: 0.1,
+    width: 44,
   },
   calcInputContainer: {
+    width: '100%',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  calcInputPressable: {
     flex: 1,
-    alignItems: 'flex-end',
+    minHeight: 42,
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  calcInputPressed: {
+    opacity: 0.72,
   },
   calcInput: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FONTS.semiBold,
+    fontSize: 21,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
-  rateHintRow: {
+  swapRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 6,
+    height: 30,
+    marginVertical: 3,
   },
-  rateHintLine: {
+  swapLine: {
     flex: 1,
     height: 1,
     backgroundColor: COLORS.divider,
   },
-  rateHint: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
+  swapButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderWidth: 1,
   },
   copyBtn: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
-    backgroundColor: COLORS.card,
+    marginLeft: 8,
+    backgroundColor: 'rgba(255,255,255,0.055)',
   },
   actionsDivider: {
-    height: 1,
+    width: 1,
+    height: 22,
     backgroundColor: COLORS.divider,
-    marginTop: 14,
-    marginBottom: 6,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
+    gap: 18,
+    paddingTop: 14,
+    paddingBottom: 2,
   },
   actionBtn: {
     flexDirection: 'row',
@@ -536,9 +654,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   actionText: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 14,
-    fontWeight: '600',
     marginLeft: 6,
   },
 });

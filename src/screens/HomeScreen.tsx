@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CalendarClock, CalendarSearch, DollarSign, Euro, Menu, WifiOff } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { useRates } from '../context/RatesContext';
 import { RateCard } from '../components/RateCard';
 import { UsdtIcon } from '../components/UsdtIcon';
@@ -32,18 +33,29 @@ import { CurrencyGap } from '../components/CurrencyGap';
 import { SettingsScreen } from './SettingsScreen';
 
 type CardKey = 'bcv' | 'euro' | 'parallel';
+type SectionKey = MenuKey | 'fuentes' | 'history';
 
-const SECTION_TITLES: Record<MenuKey, string> = {
+const SECTION_TITLES: Record<SectionKey, string> = {
   fuentes: 'Fuentes',
   pago: 'Mis datos',
   ajustes: 'Ajustes',
-  // 'history' abre HistoryModal (no usa SectionModal); presente solo por tipado.
   history: 'Historial completo',
 };
 
 // Versionada: al rediseñar el tutorial se incrementa el sufijo para que vuelva a
 // mostrarse una vez a quienes ya completaron una versión anterior.
 const ONBOARDING_KEY = '@kuanto/onboarding_done_v3';
+
+function getTodayVetISO(): string {
+  const vet = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  return vet.toISOString().split('T')[0];
+}
+
+function addDaysISO(dateISO: string, days: number): string {
+  const [y, m, d] = dateISO.split('-').map((n) => parseInt(n, 10));
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().split('T')[0];
+}
 
 export function HomeScreen() {
   const { rates, loading, isStale, error, refresh } = useRates();
@@ -52,8 +64,7 @@ export function HomeScreen() {
   const [dateMode, setDateMode] = useState<'today' | 'next'>('today');
   const [menuOpen, setMenuOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [section, setSection] = useState<MenuKey | null>(null);
+  const [section, setSection] = useState<SectionKey | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
   const [pagoEditingId, setPagoEditingId] = useState<string | null>(null);
@@ -101,6 +112,25 @@ export function HomeScreen() {
     setPagoEditingId(null);
   };
 
+  const closeSectionModal = () => {
+    // Fuentes e Historial se abren desde Ajustes → al volver, regresan a Ajustes.
+    if (section === 'fuentes' || section === 'history') {
+      setSection('ajustes');
+      return;
+    }
+    closePagoModal();
+  };
+
+  // El Historial es una sección del SectionModal (como Mis datos): solo cambiamos
+  // de sección, sin abrir un segundo modal → sin carreras ni pantallas negras.
+  const openHistoryFromSettings = () => {
+    setSection('history');
+  };
+
+  const openSourcesFromSettings = () => {
+    setSection('fuentes');
+  };
+
   const finishOnboarding = () => {
     AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
     setOnboardingActive(false);
@@ -146,6 +176,20 @@ export function HomeScreen() {
   const bcvUpdate = useFuture
     ? `Próxima · ${rates!.nextRates!.date}`
     : rates?.lastUpdate ?? '—';
+  const futureNotice =
+    useFuture && rates?.nextRates
+      ? {
+          label:
+            rates.nextRates.rawDate === addDaysISO(getTodayVetISO(), 1)
+              ? 'Mañana'
+              : 'Próxima tasa',
+          prefix:
+            rates.nextRates.rawDate === addDaysISO(getTodayVetISO(), 1)
+              ? 'Para mañana'
+              : 'Para',
+          dateLabel: rates.nextRates.date,
+        }
+      : undefined;
 
   const displayRates = rates
     ? {
@@ -291,6 +335,7 @@ export function HomeScreen() {
                 onToggle={() => toggle('bcv')}
                 onCalcFocus={() => scrollCardIntoView('bcv')}
                 paymentMethods={paymentMethods}
+                futureNotice={futureNotice}
               />
             </View>
 
@@ -307,6 +352,7 @@ export function HomeScreen() {
                 onToggle={() => toggle('euro')}
                 onCalcFocus={() => scrollCardIntoView('euro')}
                 paymentMethods={paymentMethods}
+                futureNotice={futureNotice}
               />
             </View>
 
@@ -340,13 +386,6 @@ export function HomeScreen() {
         )}
       </SafeAreaView>
 
-      <CalendarModal isVisible={calendarOpen} onClose={() => setCalendarOpen(false)} />
-      <HistoryModal
-        visible={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onOpenCalendar={() => setCalendarOpen(true)}
-      />
-
       <HeaderMenu
         visible={menuOpen}
         topOffset={insets.top + 52}
@@ -358,20 +397,37 @@ export function HomeScreen() {
         onSelect={(key) => {
           setMenuOpen(false);
           if (onboardingActive) finishOnboarding();
-          if (key === 'history') {
-            setHistoryOpen(true);
-          } else {
-            setSection(key);
-          }
+          setSection(key);
         }}
       />
       <SectionModal
-        visible={section === 'fuentes' || section === 'ajustes' || section === 'pago'}
+        visible={
+          section === 'fuentes' ||
+          section === 'ajustes' ||
+          section === 'pago' ||
+          section === 'history'
+        }
         title={section ? SECTION_TITLES[section] : ''}
-        onClose={closePagoModal}
+        onClose={closeSectionModal}
       >
         {section === 'fuentes' && <SourcesScreen />}
-        {section === 'ajustes' && <SettingsScreen onClose={() => setSection(null)} />}
+        {section === 'ajustes' && (
+          <SettingsScreen
+            onClose={() => setSection(null)}
+            onOpenHistory={openHistoryFromSettings}
+            onOpenSources={openSourcesFromSettings}
+          />
+        )}
+        {section === 'history' && (
+          <HistoryModal
+            embedded
+            visible
+            // Cierre interno (exportar / "buscar por fecha") → cierra del todo a
+            // Home; el botón ⬅ del SectionModal es el que regresa a Ajustes.
+            onClose={() => setSection(null)}
+            onOpenCalendar={() => setCalendarOpen(true)}
+          />
+        )}
         {section === 'pago' && (
           <PagoMovilScreen
             paymentMethods={paymentMethods}
@@ -382,6 +438,8 @@ export function HomeScreen() {
           />
         )}
       </SectionModal>
+
+      <CalendarModal isVisible={calendarOpen} onClose={() => setCalendarOpen(false)} />
 
       {/* Tutorial flotante: paso 1 (menú cerrado) apunta al ☰; paso 2 (menú abierto) a "Mis datos". */}
       <CoachMark
@@ -394,7 +452,7 @@ export function HomeScreen() {
       <CoachMark
         visible={onboardingActive && menuOpen}
         onDismiss={finishOnboarding}
-        topOffset={insets.top + 214}
+        topOffset={insets.top + 166}
         text="Elige 'Mis datos' para guardar tu pago móvil"
         autoDismissMs={0}
       />
@@ -462,6 +520,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bcvGreen,
   },
   updateStamp: {
+    fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     fontSize: 12,
     opacity: 0.7,
@@ -476,6 +535,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
+    fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     marginTop: 12,
     fontSize: 14,
@@ -490,12 +550,14 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   offlineText: {
+    fontFamily: FONTS.medium,
     color: COLORS.parallelOrange,
     fontSize: 13,
     marginLeft: 8,
     flex: 1,
   },
   subtitle: {
+    fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     fontSize: 14,
     textAlign: 'center',
@@ -523,14 +585,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bcvGreen,
   },
   dateBtnText: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 15,
-    fontWeight: '700',
   },
   dateBtnTextActive: {
     color: '#0a1a0e',
   },
   hint: {
+    fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
@@ -538,16 +601,17 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   sectionLabel: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    letterSpacing: 0.1,
     marginBottom: 10,
     marginTop: 8,
     marginLeft: 2,
     opacity: 0.7,
   },
   disclaimer: {
+    fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     fontSize: 12,
     lineHeight: 17,

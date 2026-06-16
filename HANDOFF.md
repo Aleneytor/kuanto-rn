@@ -4,23 +4,47 @@
 
 ## ▶️ Por dónde seguir (próxima sesión)
 
-**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel .xlsx, con caché y agregación diaria), **Fuentes**, **Ajustes** (rediseño de marca), **compartir tasa + método de pago**, **ícono + splash de marca**, y **tutorial de bienvenida** (primer arranque). Verificado con `npm run typecheck` + `npx expo export --platform ios`.
+**Estado:** App funcional y fluida. Home estilo web (calculadora, calendario, historial, brecha del día), **Mis datos** reconstruida (pantalla nativa, sin lag), **Historial Completo** (lista + export a Excel .xlsx, con caché y agregación diaria), **Fuentes**, **Ajustes** (rediseño de marca), **compartir tasa + método de pago**, **ícono + splash de marca**, y **tutorial de bienvenida** (primer arranque), y **notificaciones** (recordatorios USDT locales + alerta push de nueva tasa BCV). Verificado con `npm run typecheck` + `npx expo export --platform ios`.
 
 **Antes de empezar:** `git pull`. Nota: `npx tsc --noEmit` crashea por un bug de pila de Node v25 → usá **`npm run typecheck`**.
 
-**⚠️ Acción inmediata (pendiente de la sesión 2026-06-09):** correr **`db/p2p_daily_avg.sql`** una vez en el SQL Editor de Supabase para activar la carga rápida del Historial. Hasta entonces funciona con respaldo (más lento solo en la 1ª carga; reaperturas instantáneas por caché).
+**✅ Supabase (ya ejecutado por el usuario):** `db/p2p_daily_avg.sql` (Historial rápido activo) y `db/bcv_push_notify.sql` (tabla `device_push_tokens` + trigger del BCV creados).
+
+**⚠️ Única acción pendiente para el push del BCV** (NO aplica a Expo Go): `eas init` (crea `extra.eas.projectId`) → dev/prod build con credenciales **FCM** (Android) / **APNs** (iOS) → en Ajustes activar "Nueva tasa BCV" para registrar el token. El SQL ya está; solo falta que haya tokens registrados (requiere el build). *(Los recordatorios USDT ya funcionan en Expo Go.)*
 
 **Pendientes (elige uno):**
 
-1. **Notificaciones reales**: con `expo-notifications` (nueva tasa BCV / movimiento del paralelo). El toggle de Ajustes ya guarda la preferencia en AsyncStorage. Ojo: en Expo Go SDK 54 las locales funcionan, el push remoto necesita un dev build.
-2. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
-3. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
+1. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
+2. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
+3. **(Opcional) Notificaciones — pulido:** ícono dedicado blanco-transparente para Android (hoy el push usa el ícono de la app), y manejar el tap del push para abrir/refrescar la tasa (`addNotificationResponseReceivedListener`).
 
 **Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
 
 ---
 
 ## 🗓️ Changelog
+
+### Sesión 2026-06-16 — Menú simplificado: Historial y Fuentes dentro de Ajustes
+
+**Reorganización del menú ☰:** ahora solo tiene **Mis datos** y **Ajustes** (para que "Mis datos" resalte como la opción importante). **Historial completo** y **Fuentes** se movieron **dentro de Ajustes** (nueva sección "Consulta" en `SettingsScreen`, con props `onOpenHistory`/`onOpenSources`). `HeaderMenu` quedó con `MenuKey = 'pago' | 'ajustes'`.
+
+**Historial completo ahora es una SECCIÓN del `SectionModal`** (como Mis datos), no un modal aparte. Antes, abrirlo desde Ajustes fallaba: iOS/RN no permite 2 modales nativos presentados a la vez, así que el `HistoryModal` quedaba en cola y solo aparecía al cerrar Ajustes (pantalla negra / "solo abría con la flecha"). Solución: `HistoryModal` ganó un prop **`embedded`** que lo renderiza sin su propio `<Modal>` (sin backdrop/cierre/animación; el `SectionModal` pone el título y la flecha ⬅) y carga los datos de una. En `HomeScreen`, "Historial completo" hace `setSection('history')`. Se eliminó toda la maquinaria frágil del intento anterior (modal suelto, `historyOpen`, `onDismiss`/`pendingHistory`, timers, capa `modalTransitionCover`).
+
+**Navegación:** la flecha ⬅ desde Historial/Fuentes regresa a **Ajustes** (de donde se abren, vía `closeSectionModal`). El botón interno "buscar por fecha" del Historial cierra a Home y abre el Calendario (el calendario es otro modal y no puede apilarse sobre el de Ajustes).
+
+> En paralelo se integró **Poppins** (`src/theme/typography.ts`, `FONTS`) y ajustes de UI en `RateCard`/`CurrencyGap`/`HistorySection`. Todo convive en el árbol (verificado: typecheck + export OK), aún sin commitear.
+
+### Sesión 2026-06-13 — Notificaciones (recordatorios USDT locales + push de nueva tasa BCV)
+
+**Recordatorios USDT (local — funciona en Expo Go y en el build final):** 2 notificaciones diarias suaves a las **9:00 y 13:00** (hora del dispositivo) que invitan a revisar el Promedio USDT (antes el paralelo "se publicaba" a esas horas; ahora se actualiza siempre, pero se mantiene ese ritmo como recordatorio). Canal Android de baja importancia (no intrusivo). En `src/services/notificationService.ts` (`scheduleUsdtReminders` / `cancelUsdtReminders`). **Mensajes rotativos:** 30 textos distintos que rotan por fecha (`USDT_REMINDER_MESSAGES` + `messageForDate`, AM/PM con offset distinto) para que no sea repetitivo. Como `DAILY` no permite variar el texto, se agendan notifs one-shot con fecha en una **ventana rodante de 14 días** (×2/día = 28 pendientes; iOS topa en 64), que se re-topa en cada arranque (`bootstrapNotifications`).
+
+**Alerta nueva tasa BCV (push remoto):** notifica **justo al insertarse** la fila nueva en `bcv_rates_history` (el scraper corre desde las 5pm VET cada 30 min hasta publicar). El disparo es **server-side**: trigger `AFTER INSERT` + función `pg_net` que llama a la API de Expo Push — **`db/bcv_push_notify.sql`**. La app registra su Expo push token en la tabla `device_push_tokens` (`registerForBcvPush`). Canal Android de alta importancia. **El push remoto NO funciona en Expo Go** (doc SDK 54): requiere dev/prod build + `projectId` de EAS; el código **degrada con gracia** (sin projectId no registra y no rompe).
+
+**Ajustes:** el toggle único "Notificaciones" se separó en **2 toggles reales** ("Recordatorio USDT" y "Nueva tasa BCV") cableados al servicio (`SettingsScreen.tsx`); migra la clave vieja `@app_notifications`. Claves nuevas `@notif_usdt` / `@notif_bcv`.
+
+**Cableado:** `index.ts` llama `configureHandlerAndChannels()` (handler + canales) al arrancar; `App.tsx` llama `bootstrapNotifications()` al montar (reagenda/recupera token según preferencias). Plugin `expo-notifications` (color de acento) en `app.json`. Deps nuevas: `expo-notifications`, `expo-device`, `expo-constants`.
+
+> **⚠️ ACCIÓN PENDIENTE para activar el push BCV** (no aplica a Expo Go): (1) `eas login && eas init` → crea `extra.eas.projectId`; (2) generar dev/prod build con credenciales **FCM** (Android) / **APNs** (iOS) que pide el wizard de `eas build`; (3) correr **`db/bcv_push_notify.sql`** en el SQL Editor de Supabase; (4) en Ajustes activar "Nueva tasa BCV" para guardar el token y probar. **Los recordatorios USDT ya funcionan sin nada de esto.**
 
 ### Sesión 2026-06-12 — tutorial flotante (coach-marks) + carga progresiva del Historial
 

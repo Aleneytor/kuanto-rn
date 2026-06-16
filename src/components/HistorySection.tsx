@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Activity } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { formatChange, formatCurrency } from '../utils/formatting';
 import {
   fetchSeriesHistory,
@@ -145,10 +146,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.2,
   },
   seriesRow: {
     flexDirection: 'row',
@@ -166,9 +167,9 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   seriesChipText: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textSecondary,
     fontSize: 13,
-    fontWeight: '700',
   },
   seriesChipTextActive: {
     color: '#0a1a0e',
@@ -179,13 +180,13 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   value: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.text,
     fontSize: 24,
-    fontWeight: '700',
   },
   change: {
+    fontFamily: FONTS.medium,
     fontSize: 13,
-    fontWeight: '600',
     marginLeft: 10,
   },
   chartWrap: {
@@ -215,9 +216,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.glassStrong,
   },
   periodText: {
+    fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
   },
   periodTextActive: {
     color: COLORS.text,

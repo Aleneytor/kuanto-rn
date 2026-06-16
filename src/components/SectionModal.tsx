@@ -8,10 +8,12 @@ interface Props {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /** iOS: se llama cuando el modal terminó de cerrarse (para encadenar otro modal sin carrera). */
+  onDismiss?: () => void;
   children?: ReactNode;
 }
 
-export function SectionModal({ visible, title, onClose, children }: Props) {
+export function SectionModal({ visible, title, onClose, onDismiss, children }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -19,6 +21,7 @@ export function SectionModal({ visible, title, onClose, children }: Props) {
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
       statusBarTranslucent
     >
       <View

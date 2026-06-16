@@ -53,6 +53,8 @@ interface HistoryModalProps {
   visible: boolean;
   onClose: () => void;
   onOpenCalendar?: () => void;
+  /** Embebido como sección dentro del SectionModal (sin <Modal> propio ni cierre). */
+  embedded?: boolean;
 }
 
 interface UnifiedHistoryItem {
@@ -84,7 +86,7 @@ function mergeHistoryRows(
   return Object.values(unified).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalProps) {
+export function HistoryModal({ visible, onClose, onOpenCalendar, embedded = false }: HistoryModalProps) {
   // View State: 'list' | 'export'
   const [view, setView] = useState<'list' | 'export'>('list');
 
@@ -115,8 +117,6 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
     if (visible) {
       loadRunRef.current += 1;
       const openRunId = loadRunRef.current;
-      anim.stopAnimation();
-      anim.setValue(0);
       setMounted(true);
       setView('list');
       setExportLoading(false);
@@ -124,6 +124,15 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
       setContentReady(false);
       setDataLoading(true);
       setUsdtLoading(false);
+      // Embebido (sección del SectionModal): sin animación de modal; mostramos
+      // y cargamos de una.
+      if (embedded) {
+        setContentReady(true);
+        loadHistory();
+        return;
+      }
+      anim.stopAnimation();
+      anim.setValue(0);
       requestAnimationFrame(() => {
         Animated.timing(anim, {
           toValue: 1,
@@ -340,55 +349,34 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
     );
   };
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-      statusBarTranslucent
-      hardwareAccelerated
-    >
-      <View style={styles.overlay}>
-        {/* Backdrop */}
-        <Animated.View
-          style={[styles.backdrop, { opacity: backdropOpacity }]}
-          pointerEvents="auto"
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
-
-        {/* Card */}
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              transform: [{ translateY }, { scale }],
-              maxHeight: SCREEN_H * 0.85,
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              {view === 'export' ? (
-                <>
-                  <TouchableOpacity onPress={() => setView('list')} style={styles.backBtn}>
-                    <ChevronLeft size={24} color={COLORS.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.title}>Exportar Excel</Text>
-                </>
-              ) : (
-                <>
-                  <History size={20} color={COLORS.textSecondary} />
-                  <Text style={styles.title}>HISTORIAL DE PRECIOS</Text>
-                </>
+  const content = (
+    <>
+          {/* Header — embebido: solo en "exportar" (para volver a la lista). El
+              título y la flecha de cierre los pone el SectionModal. */}
+          {(!embedded || view === 'export') && (
+            <View style={styles.header}>
+              <View style={styles.headerTitleRow}>
+                {view === 'export' ? (
+                  <>
+                    <TouchableOpacity onPress={() => setView('list')} style={styles.backBtn}>
+                      <ChevronLeft size={24} color={COLORS.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>Exportar Excel</Text>
+                  </>
+                ) : (
+                  <>
+                    <History size={20} color={COLORS.textSecondary} />
+                    <Text style={styles.title}>HISTORIAL DE PRECIOS</Text>
+                  </>
+                )}
+              </View>
+              {!embedded && (
+                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                  <X size={20} color={COLORS.text} />
+                </TouchableOpacity>
               )}
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color={COLORS.text} />
-            </TouchableOpacity>
-          </View>
+          )}
 
           {/* Content */}
           <View style={styles.body}>
@@ -530,6 +518,43 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
               </TouchableOpacity>
             )}
           </View>
+    </>
+  );
+
+  // Embebido: ocupa toda la sección del SectionModal (sin modal propio).
+  if (embedded) {
+    return <View style={styles.embeddedRoot}>{content}</View>;
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      hardwareAccelerated
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop */}
+        <Animated.View
+          style={[styles.backdrop, { opacity: backdropOpacity }]}
+          pointerEvents="auto"
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
+
+        {/* Card */}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              transform: [{ translateY }, { scale }],
+              maxHeight: SCREEN_H * 0.85,
+            },
+          ]}
+        >
+          {content}
         </Animated.View>
       </View>
     </Modal>
@@ -537,6 +562,10 @@ export function HistoryModal({ visible, onClose, onOpenCalendar }: HistoryModalP
 }
 
 const styles = StyleSheet.create({
+  embeddedRoot: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'center',

@@ -20,22 +20,37 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Coins,
+  Database,
   FileText,
   Globe,
+  History,
   Mail,
   Share2,
   Star,
 } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
+import {
+  KEY_USDT,
+  KEY_BCV,
+  requestPermissions,
+  scheduleUsdtReminders,
+  cancelUsdtReminders,
+  registerForBcvPush,
+  unregisterBcvPush,
+} from '../services/notificationService';
 
-const NOTIFICATIONS_KEY = '@app_notifications';
+const LEGACY_NOTIF_KEY = '@app_notifications';
 
 interface Props {
   onClose: () => void;
+  onOpenHistory: () => void;
+  onOpenSources: () => void;
 }
 
-export function SettingsScreen({ onClose }: Props) {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+export function SettingsScreen({ onClose, onOpenHistory, onOpenSources }: Props) {
+  const [usdtEnabled, setUsdtEnabled] = useState(false);
+  const [bcvEnabled, setBcvEnabled] = useState(false);
   const [legalExpanded, setLegalExpanded] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -51,27 +66,75 @@ export function SettingsScreen({ onClose }: Props) {
 
   const loadNotificationSettings = async () => {
     try {
-      const val = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
-      if (val !== null) {
-        setNotificationsEnabled(JSON.parse(val));
+      const [usdt, bcv, legacy] = await Promise.all([
+        AsyncStorage.getItem(KEY_USDT),
+        AsyncStorage.getItem(KEY_BCV),
+        AsyncStorage.getItem(LEGACY_NOTIF_KEY),
+      ]);
+      // Migración del toggle único anterior: si estaba activo, encender ambos.
+      if (usdt === null && bcv === null && legacy === 'true') {
+        setUsdtEnabled(true);
+        setBcvEnabled(true);
+        return;
       }
+      setUsdtEnabled(usdt === 'true');
+      setBcvEnabled(bcv === 'true');
     } catch (err) {
       console.warn('[Settings] Error loading notification settings:', err);
     }
   };
 
-  const toggleNotifications = async (val: boolean) => {
+  const toggleUsdt = async (val: boolean) => {
     try {
-      setNotificationsEnabled(val);
-      await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(val));
+      setUsdtEnabled(val);
+      await AsyncStorage.setItem(KEY_USDT, val ? 'true' : 'false');
       if (val) {
-        Alert.alert(
-          'Alertas Activadas',
-          'Recibirás notificaciones cuando se publiquen nuevas tasas oficiales (1 PM y 5 PM aprox.).',
-        );
+        const granted = await requestPermissions();
+        if (!granted) {
+          setUsdtEnabled(false);
+          await AsyncStorage.setItem(KEY_USDT, 'false');
+          Alert.alert(
+            'Permiso necesario',
+            'Activa las notificaciones de Kuanto desde los ajustes de tu teléfono para recibir los recordatorios.',
+          );
+          return;
+        }
+        await scheduleUsdtReminders();
+      } else {
+        await cancelUsdtReminders();
       }
     } catch (err) {
-      console.warn('[Settings] Error saving notification settings:', err);
+      console.warn('[Settings] Error toggling USDT reminders:', err);
+    }
+  };
+
+  const toggleBcv = async (val: boolean) => {
+    try {
+      setBcvEnabled(val);
+      await AsyncStorage.setItem(KEY_BCV, val ? 'true' : 'false');
+      if (val) {
+        const granted = await requestPermissions();
+        if (!granted) {
+          setBcvEnabled(false);
+          await AsyncStorage.setItem(KEY_BCV, 'false');
+          Alert.alert(
+            'Permiso necesario',
+            'Activa las notificaciones de Kuanto desde los ajustes de tu teléfono.',
+          );
+          return;
+        }
+        const token = await registerForBcvPush();
+        if (!token) {
+          Alert.alert(
+            'Casi listo',
+            'La alerta del BCV requiere la versión instalada de Kuanto (no funciona en Expo Go). Tu preferencia quedó guardada y se activará en la app instalada.',
+          );
+        }
+      } else {
+        await unregisterBcvPush();
+      }
+    } catch (err) {
+      console.warn('[Settings] Error toggling BCV alert:', err);
     }
   };
 
@@ -131,25 +194,85 @@ export function SettingsScreen({ onClose }: Props) {
           </Text>
         </View>
 
+        {/* Sección Consulta: Historial + Fuentes (movidos aquí desde el menú ☰) */}
+        <Text style={styles.sectionHeader}>Consulta</Text>
+        <View style={styles.sectionCard}>
+          <Pressable
+            onPress={onOpenHistory}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          >
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, styles.blueIconBox]}>
+                <History size={18} color={COLORS.euroBlue} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>Historial completo</Text>
+                <Text style={styles.rowSubtitle}>Tasas por día y exportar a Excel</Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable
+            onPress={onOpenSources}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          >
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, styles.greenIconBox]}>
+                <Database size={18} color={COLORS.bcvGreen} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>Fuentes</Text>
+                <Text style={styles.rowSubtitle}>De dónde provienen las tasas</Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color="rgba(255, 255, 255, 0.25)" />
+          </Pressable>
+        </View>
+
         {/* Sección General */}
         <Text style={styles.sectionHeader}>General</Text>
         <View style={styles.sectionCard}>
-          {/* Fila: Notificaciones */}
+          {/* Fila: Recordatorio USDT (local, suave) */}
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, styles.orangeIconBox]}>
+                <Coins size={18} color={COLORS.parallelOrange} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>Recordatorio USDT</Text>
+                <Text style={styles.rowSubtitle}>Promedio del paralelo · 9am y 1pm</Text>
+              </View>
+            </View>
+            <Switch
+              value={usdtEnabled}
+              onValueChange={toggleUsdt}
+              trackColor={{ false: '#3a3a3c', true: COLORS.bcvGreen + '66' }}
+              thumbColor={usdtEnabled ? COLORS.bcvGreen : '#aeaeb2'}
+              ios_backgroundColor="#2c2c2e"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Fila: Nueva tasa BCV (push remoto) */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, styles.greenIconBox]}>
                 <Bell size={18} color={COLORS.bcvGreen} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>Notificaciones</Text>
-                <Text style={styles.rowSubtitle}>Recibe alertas de tasas diarias</Text>
+                <Text style={styles.rowTitle}>Nueva tasa BCV</Text>
+                <Text style={styles.rowSubtitle}>Aviso al publicarse la tasa oficial</Text>
               </View>
             </View>
             <Switch
-              value={notificationsEnabled}
-              onValueChange={toggleNotifications}
+              value={bcvEnabled}
+              onValueChange={toggleBcv}
               trackColor={{ false: '#3a3a3c', true: COLORS.bcvGreen + '66' }}
-              thumbColor={notificationsEnabled ? COLORS.bcvGreen : '#aeaeb2'}
+              thumbColor={bcvEnabled ? COLORS.bcvGreen : '#aeaeb2'}
               ios_backgroundColor="#2c2c2e"
             />
           </View>
