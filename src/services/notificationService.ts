@@ -256,6 +256,19 @@ export async function unregisterBcvPush(): Promise<void> {
   }
 }
 
+// --- Tap de notificación ---
+
+/**
+ * Suscribe un handler que se llama cuando el usuario TOCA una notificación
+ * (recordatorio USDT o push del BCV) con la app abierta o en segundo plano.
+ * Útil para refrescar las tasas al abrir. Devuelve la función para desuscribir.
+ * (El arranque en frío ya recarga solas las tasas vía RatesContext.)
+ */
+export function addNotificationTapHandler(onTap: () => void): () => void {
+  const sub = Notifications.addNotificationResponseReceivedListener(() => onTap());
+  return () => sub.remove();
+}
+
 // --- Bootstrap al arrancar ---
 
 /**

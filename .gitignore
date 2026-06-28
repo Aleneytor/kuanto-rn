@@ -13,6 +13,7 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -45,3 +46,11 @@ yarn-error.*
 
 # copia local del repo web (solo referencia, no parte de la app)
 temp_kuanto_web/
+
+# Firebase / FCM — NO commitear
+# service account = SECRETO (clave de envío de push); va solo a EAS credentials.
+*-firebase-adminsdk-*.json
+# config cliente (queda embebida en el APK, pero la ignoramos por precaución;
+# para builds en la nube de EAS hay que commitearla o subirla como secret).
+google-services.json
+GoogleService-Info.plist

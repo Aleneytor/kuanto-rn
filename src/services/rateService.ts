@@ -325,34 +325,13 @@ export async function fetchSeriesHistory(
   const fromDate = getDateByPeriod(period);
 
   if (series === 'parallel') {
-    // P2P: paginar y promediar por día (hora de Venezuela)
-    let all: Array<{ price: number | string; created_at: string }> = [];
-    const pageSize = 1000;
-    for (let page = 0; page < 30; page++) {
-      const { data, error } = await supabase
-        .from('p2p_rate_history')
-        .select('price, created_at')
-        .gte('created_at', `${fromDate}T00:00:00.000Z`)
-        .order('created_at', { ascending: true })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-      if (error || !data || data.length === 0) break;
-      all = all.concat(data as typeof all);
-      if (data.length < pageSize) break;
-    }
-
-    const daily: Record<string, { sum: number; count: number }> = {};
-    for (const item of all) {
-      const utc = new Date(item.created_at);
-      const vet = new Date(utc.getTime() - 4 * 60 * 60 * 1000);
-      const ds = vet.toISOString().split('T')[0];
-      const price = toNumber(item.price);
-      if (price <= 0) continue;
-      if (!daily[ds]) daily[ds] = { sum: 0, count: 0 };
-      daily[ds].sum += price;
-      daily[ds].count += 1;
-    }
-    return Object.entries(daily)
-      .map(([date, { sum, count }]) => ({ date, value: count > 0 ? sum / count : 0 }))
+    // Promedio diario de USDT desde la vista agregada `p2p_daily_avg` (rápida:
+    // ~1 fila/día). Antes este gráfico bajaba y promediaba MILES de ticks de
+    // p2p_rate_history en el cliente → tardaba mucho. `fetchUsdtDailyAverages`
+    // ya cae a ticks automáticamente si la vista no existe.
+    const daily = await fetchUsdtDailyAverages(period, fromDate);
+    return daily
+      .map((d) => ({ date: d.date, value: d.usdt }))
       .filter((e) => e.value > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
   }

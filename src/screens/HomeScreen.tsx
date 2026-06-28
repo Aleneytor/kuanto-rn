@@ -31,6 +31,15 @@ import { PagoMovilScreen } from './PagoMovilScreen';
 import { type PaymentMethod } from '../constants/banks';
 import { CurrencyGap } from '../components/CurrencyGap';
 import { SettingsScreen } from './SettingsScreen';
+import { NotificationPrompt } from '../components/NotificationPrompt';
+import {
+  addNotificationTapHandler,
+  requestPermissions,
+  scheduleUsdtReminders,
+  registerForBcvPush,
+  KEY_USDT,
+  KEY_BCV,
+} from '../services/notificationService';
 
 type CardKey = 'bcv' | 'euro' | 'parallel';
 type SectionKey = MenuKey | 'fuentes' | 'history';
@@ -45,6 +54,7 @@ const SECTION_TITLES: Record<SectionKey, string> = {
 // Versionada: al rediseñar el tutorial se incrementa el sufijo para que vuelva a
 // mostrarse una vez a quienes ya completaron una versión anterior.
 const ONBOARDING_KEY = '@kuanto/onboarding_done_v3';
+const NOTIF_PROMPT_KEY = '@kuanto/notif_prompt_v1';
 
 function getTodayVetISO(): string {
   const vet = new Date(Date.now() - 4 * 60 * 60 * 1000);
@@ -69,11 +79,14 @@ export function HomeScreen() {
   const [pagoInitialMode, setPagoInitialMode] = useState<'list' | 'form'>('list');
   const [pagoEditingId, setPagoEditingId] = useState<string | null>(null);
   const [onboardingActive, setOnboardingActive] = useState(false);
+  const [notifPromptVisible, setNotifPromptVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   const scrollRef = useRef<any>(null);
   const cardY = useRef<Record<CardKey, number>>({ bcv: 0, euro: 0, parallel: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   useEffect(() => {
     loadPaymentMethods();
@@ -88,6 +101,18 @@ export function HomeScreen() {
       .catch(() => {});
   }, []);
 
+  // Aviso de notificaciones (priming): solo la 1ª vez y si aún no activó nada.
+  useEffect(() => {
+    (async () => {
+      const [asked, usdt, bcv] = await Promise.all([
+        AsyncStorage.getItem(NOTIF_PROMPT_KEY),
+        AsyncStorage.getItem(KEY_USDT),
+        AsyncStorage.getItem(KEY_BCV),
+      ]);
+      if (!asked && usdt !== 'true' && bcv !== 'true') setNotifPromptVisible(true);
+    })().catch(() => {});
+  }, []);
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -96,6 +121,12 @@ export function HomeScreen() {
       ])
     ).start();
   }, [pulseAnim]);
+
+  // Tocar una notificación (recordatorio USDT / push del BCV) refresca las tasas.
+  useEffect(() => {
+    const unsub = addNotificationTapHandler(() => refreshRef.current());
+    return unsub;
+  }, []);
 
   const loadPaymentMethods = async () => {
     try {
@@ -134,6 +165,29 @@ export function HomeScreen() {
   const finishOnboarding = () => {
     AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
     setOnboardingActive(false);
+  };
+
+  const acceptNotifications = async () => {
+    setNotifPromptVisible(false);
+    try {
+      await AsyncStorage.setItem(NOTIF_PROMPT_KEY, 'true');
+      const granted = await requestPermissions();
+      if (granted) {
+        await AsyncStorage.multiSet([
+          [KEY_USDT, 'true'],
+          [KEY_BCV, 'true'],
+        ]);
+        await scheduleUsdtReminders();
+        await registerForBcvPush();
+      }
+    } catch (err) {
+      console.warn('[Notif] aceptar prompt:', err);
+    }
+  };
+
+  const declineNotifications = () => {
+    setNotifPromptVisible(false);
+    AsyncStorage.setItem(NOTIF_PROMPT_KEY, 'true').catch(() => {});
   };
 
   const onRefresh = async () => {
@@ -441,16 +495,23 @@ export function HomeScreen() {
 
       <CalendarModal isVisible={calendarOpen} onClose={() => setCalendarOpen(false)} />
 
+      {/* Aviso de notificaciones (1ª vez). Se muestra antes del tutorial. */}
+      <NotificationPrompt
+        visible={notifPromptVisible}
+        onAccept={acceptNotifications}
+        onDecline={declineNotifications}
+      />
+
       {/* Tutorial flotante: paso 1 (menú cerrado) apunta al ☰; paso 2 (menú abierto) a "Mis datos". */}
       <CoachMark
-        visible={onboardingActive && !menuOpen}
+        visible={onboardingActive && !menuOpen && !notifPromptVisible}
         onDismiss={finishOnboarding}
         topOffset={insets.top + 56}
         text="Toca el menú ☰ para añadir tus datos de pago"
         autoDismissMs={9000}
       />
       <CoachMark
-        visible={onboardingActive && menuOpen}
+        visible={onboardingActive && menuOpen && !notifPromptVisible}
         onDismiss={finishOnboarding}
         topOffset={insets.top + 166}
         text="Elige 'Mis datos' para guardar tu pago móvil"

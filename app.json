@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kuanto",
     "slug": "kuanto",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,6 +10,9 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.aleneytor.app",
+      "versionCode": 17,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#02DF82"
@@ -34,9 +37,16 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#02DF82"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3b9fa157-395c-47fd-bf5d-66b44aa51d5f"
+      }
+    },
+    "owner": "aoraestudio"
   }
 }

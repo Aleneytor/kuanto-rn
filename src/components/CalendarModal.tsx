@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -15,6 +16,7 @@ import {
   CalendarSearch,
   ChevronLeft,
   ChevronRight,
+  Share2,
   X,
 } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
@@ -119,6 +121,24 @@ export function CalendarModal({ isVisible, onClose }: Props) {
     loadDate(iso);
   };
 
+  const shareHistoricalRates = async () => {
+    if (!result) return;
+    const longDate = formatLongDate(selected);
+    let message = `💱 *Kuanto — Tasas Históricas*\n📅 *${longDate}*\n\n`;
+    message += `🇺🇸 *Dólar BCV:* ${formatCurrency(result.usd)} Bs\n`;
+    message += `🇪🇺 *Euro BCV:* ${formatCurrency(result.eur)} Bs\n`;
+    if (result.parallel != null) {
+      message += `🪙 *Paralelo:* ${formatCurrency(result.parallel)} Bs\n`;
+    }
+    message += `\n_Consultado en kuanto.online_ 📲`;
+
+    try {
+      await Share.share({ message });
+    } catch {
+      /* usuario canceló */
+    }
+  };
+
   return (
     <Modal
       visible={isVisible}
@@ -213,7 +233,14 @@ export function CalendarModal({ isVisible, onClose }: Props) {
 
             {/* Resultado */}
             <View style={styles.resultBox}>
-              <Text style={styles.resultDate}>{formatLongDate(selected)}</Text>
+              <View style={styles.resultHeader}>
+                <Text style={styles.resultDate}>{formatLongDate(selected)}</Text>
+                {result && result.bcvDate && !loading && (
+                  <Pressable onPress={shareHistoricalRates} hitSlop={10} style={styles.shareBtn}>
+                    <Share2 size={16} color={COLORS.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
 
               {loading ? (
                 <View style={styles.resultLoading}>
@@ -452,12 +479,22 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 18,
   },
+  resultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   resultDate: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: '700',
     textTransform: 'capitalize',
-    marginBottom: 12,
+  },
+  shareBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   resultNote: {
     color: COLORS.parallelOrange,
