@@ -16,6 +16,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as StoreReview from 'expo-store-review';
+import Constants from 'expo-constants';
 import {
   Bell,
   ChevronDown,
@@ -151,7 +152,12 @@ export function SettingsScreen({ onClose, onOpenHistory, onOpenSources }: Props)
 
   const handleRateApp = async () => {
     try {
-      if (await StoreReview.hasAction()) {
+      // En Expo Go, la calificación integrada intentaría calificar a la app "Expo Go" en sí misma.
+      // Si estamos en Expo Go (storeClient), evitamos el diálogo nativo y forzamos la redirección
+      // directa a la Play Store para poder probar el enlace a la app de Kuanto.
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+      if (!isExpoGo && await StoreReview.hasAction()) {
         await StoreReview.requestReview();
       } else {
         const appId = 'com.aleneytor.app';
