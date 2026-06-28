@@ -12,11 +12,9 @@
 
 **⚠️ Única acción pendiente para el push del BCV** (NO aplica a Expo Go): `eas init` (crea `extra.eas.projectId`) → dev/prod build con credenciales **FCM** (Android) / **APNs** (iOS) → en Ajustes activar "Nueva tasa BCV" para registrar el token. El SQL ya está; solo falta que haya tokens registrados (requiere el build). *(Los recordatorios USDT ya funcionan en Expo Go.)*
 
-**Pendientes (elige uno):**
+**Pendientes:**
 
-1. **Compartir tasa histórica** desde el calendario (hoy solo consulta; no comparte).
-2. **(Opcional) Migrar el gráfico del Home** (`fetchSeriesHistory('parallel')` en `rateService`) a la vista `p2p_daily_avg`, igual que el Historial (hoy aún baja ticks).
-3. **(Opcional) Notificaciones — pulido:** ícono dedicado blanco-transparente para Android (hoy el push usa el ícono de la app), y manejar el tap del push para abrir/refrescar la tasa (`addNotificationResponseReceivedListener`).
+¡Todos los pendientes principales han sido completados para esta versión!
 
 **Rutina:** `git pull` → programar → `npm run typecheck` → `git add -A && git commit && git push`.
 
