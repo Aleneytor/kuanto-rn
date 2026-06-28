@@ -13,20 +13,24 @@ Todo el código está **completamente listo, verificado y subido a GitHub (rama 
 Sigue estos pasos en la nueva conversación desde la carpeta con la ruta limpia (por ejemplo, `C:\dev\kuanto`):
 
 ### Paso 1: Configurar la carpeta limpia
-1. Abre tu terminal en la carpeta limpia (por ejemplo, `C:\dev\kuanto`).
-2. Clona o actualiza el repositorio con la última versión:
-   ```bash
-   git clone https://github.com/Aleneytor/kuanto-rn .
-   # O si ya tenías la carpeta inicializada:
-   git pull origin main
-   ```
+Elige una de las siguientes opciones:
 
-### Paso 2: Copiar archivos sensibles ignorados (Gitignored)
-Copia manualmente desde la ruta vieja (`C:\Users\Alejandro Pérez\Documents\Apps\Kuanto new try` o del respaldo `C:\Users\Alejandro Pérez\Documents\Kuanto-CLAVES-RESPALDO\`) los siguientes archivos a la raíz de tu nueva carpeta limpia:
+* **Opción A (Copiar la carpeta completa — RECOMENDADA):**
+  Copia toda la carpeta `Kuanto new try` y pégala en la nueva ubicación limpia (por ejemplo, `C:\dev\kuanto`). Al copiar la carpeta completa, **se trasladarán automáticamente los archivos secretos/ignorados por Git** (`.env`, `*.keystore`, `google-services.json`, etc.), por lo que no tendrás que realizar el Paso 2.
+* **Opción B (Clonar desde Git):**
+  Si prefieres hacer un clon limpio desde GitHub, abre la terminal en la carpeta limpia y ejecuta:
+  ```bash
+  git clone https://github.com/Aleneytor/kuanto-rn .
+  # O si ya la tenías inicializada:
+  git pull origin main
+  ```
+
+### Paso 2: Copiar archivos sensibles ignorados (Solo para Opción B)
+Si elegiste clonar desde Git (Opción B), debes copiar manualmente desde la ruta vieja (`C:\Users\Alejandro Pérez\Documents\Apps\Kuanto new try` o de la carpeta de respaldos `C:\Users\Alejandro Pérez\Documents\Kuanto-CLAVES-RESPALDO\`) los siguientes archivos a la raíz de tu nueva carpeta limpia:
 * `.env` (credenciales públicas de Supabase)
-* `google-services.json` (configuración del cliente de Firebase para notificaciones)
+* `google-services.json` (configuración de Firebase para notificaciones Android)
 * `kuanto-upload.keystore` (clave de subida para firmar el build de producción)
-* `kuanto-d73e7-firebase-adminsdk-fbsvc-bd10e22a43.json` (service account de Firebase para credenciales EAS)
+* `kuanto-d73e7-firebase-adminsdk-fbsvc-bd10e22a43.json` (service account para credenciales EAS)
 
 ### Paso 3: Instalar dependencias
 Instala todas las dependencias (incluyendo la nueva `expo-store-review`):
