@@ -143,7 +143,7 @@ export function SettingsScreen({ onClose, onOpenHistory, onOpenSources }: Props)
   const handleShareApp = async () => {
     try {
       await Share.share({
-        message: `💱 *Kuanto*\n\nConsulta las tasas oficiales del BCV (USD/EUR) y el promedio Paralelo en Venezuela al instante de forma simple y premium.\n\n📲 Descarga la app y pruébala gratis en https://kuanto.online`,
+        message: `💱 *Kuanto*\n\nConsulta las tasas oficiales del BCV (USD/EUR) y el promedio Paralelo en Venezuela al instante de forma simple y premium.\n\n📲 Descarga la app y pruébala gratis en https://play.google.com/store/apps/details?id=com.aleneytor.app`,
       });
     } catch (err) {
       console.error('[Settings] Share error:', err);
