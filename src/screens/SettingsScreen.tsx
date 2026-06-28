@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as StoreReview from 'expo-store-review';
 import {
   Bell,
   ChevronDown,
@@ -148,11 +149,28 @@ export function SettingsScreen({ onClose, onOpenHistory, onOpenSources }: Props)
     }
   };
 
-  const handleRateApp = () => {
-    Alert.alert(
-      'Calificar Kuanto',
-      '¡Tu opinión es muy importante para nosotros! Pronto estaremos disponibles en las tiendas oficiales de Google Play y App Store.',
-    );
+  const handleRateApp = async () => {
+    try {
+      if (await StoreReview.hasAction()) {
+        await StoreReview.requestReview();
+      } else {
+        const appId = 'com.aleneytor.app';
+        const url = Platform.select({
+          android: `market://details?id=${appId}`,
+          ios: `itms-apps://itunes.apple.com/app/idYOUR_APP_ID?action=write-review`,
+        });
+        if (url) {
+          Linking.openURL(url).catch(() => {
+            const webUrl = `https://play.google.com/store/apps/details?id=${appId}`;
+            Linking.openURL(webUrl).catch(() => {
+              Alert.alert('Error', 'No se pudo abrir la tienda de aplicaciones.');
+            });
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Settings] Error showing store review:', err);
+    }
   };
 
   const handleContactSupport = () => {
