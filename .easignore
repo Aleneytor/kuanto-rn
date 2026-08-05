@@ -4,6 +4,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.eas-local-build/
 
 .kotlin/
 *.orig.*
@@ -28,6 +29,8 @@ yarn-error.*
 
 /ios
 /android
+/android-sdk/
+/.gradle_home/
 
 temp_kuanto_web/
 

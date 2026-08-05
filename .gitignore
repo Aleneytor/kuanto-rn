@@ -8,6 +8,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.eas-local-build/
 
 # Native
 .kotlin/
@@ -43,6 +44,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local Android tooling/cache folders kept out of C:\Users paths with accents
+/android-sdk/
+/.gradle_home/
 
 # copia local del repo web (solo referencia, no parte de la app)
 temp_kuanto_web/

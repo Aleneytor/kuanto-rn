@@ -107,15 +107,6 @@ export function SourcesScreen() {
         col2={{ label: 'Venta', value: p2p?.bybit.sell ?? 0 }}
       />
 
-      <SourceCard
-        logo={pngLogo(require('../../assets/sources/yadio-logo.png'))}
-        name="Yadio"
-        live
-        url="https://yadio.io"
-        col1={{ label: 'Compra', value: p2p?.yadio.buy ?? 0 }}
-        col2={{ label: 'Venta', value: p2p?.yadio.sell ?? 0 }}
-      />
-
       <Text style={styles.footer}>
         El paralelo mostrado en el inicio es el promedio de estas plataformas P2P
         (USDT/VES). Información con fines informativos.

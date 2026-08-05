@@ -38,11 +38,11 @@ export const VENEZUELAN_BANKS: Bank[] = [
 export const BANK_LOGOS: Record<string, ImageSourcePropType> = {
   '0102': require('../../assets/banks/0102.png'),
   '0104': require('../../assets/banks/0104.jpg'),
-  '0105': require('../../assets/banks/0105.png'),
+  '0105': require('../../assets/banks/0105.webp'),
   '0108': require('../../assets/banks/0108.png'),
   '0114': require('../../assets/banks/0114.jpeg'),
   '0115': require('../../assets/banks/0115.jpeg'),
-  '0128': require('../../assets/banks/0128.png'),
+  '0128': require('../../assets/banks/0128.webp'),
   '0134': require('../../assets/banks/0134.jpeg'),
   '0137': require('../../assets/banks/0137.jpg'),
   '0138': require('../../assets/banks/0138.png'),
@@ -52,7 +52,7 @@ export const BANK_LOGOS: Record<string, ImageSourcePropType> = {
   '0157': require('../../assets/banks/0157.jpg'),
   '0163': require('../../assets/banks/0163.jpg'),
   '0166': require('../../assets/banks/0166.jpg'),
-  '0168': require('../../assets/banks/0168.png'),
+  '0168': require('../../assets/banks/0168.webp'),
   '0169': require('../../assets/banks/0169.png'),
   '0171': require('../../assets/banks/0171.png'),
   '0172': require('../../assets/banks/0172.png'),
@@ -62,7 +62,7 @@ export const BANK_LOGOS: Record<string, ImageSourcePropType> = {
   '0177': require('../../assets/banks/0177.png'),
   '0178': require('../../assets/banks/0178.jpg'),
   '0191': require('../../assets/banks/0191.png'),
-  '0601': require('../../assets/banks/0601.png'),
+  '0601': require('../../assets/banks/0601.jpg'),
 };
 
 export const ACCOUNT_TYPES = [

@@ -224,16 +224,14 @@ export async function registerForBcvPush(): Promise<string | null> {
 
     await AsyncStorage.setItem(KEY_TOKEN, token);
 
-    const { error } = await supabase.from('device_push_tokens').upsert(
-      {
-        token,
-        platform: Platform.OS,
-        enabled: true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'token' },
-    );
-    if (error) console.warn('[Notif] upsert token error:', error.message);
+    // La tabla no acepta escritura directa (RLS): el registro pasa por un RPC
+    // que valida el formato del token antes de guardarlo.
+    const { error } = await supabase.rpc('register_device_push_token', {
+      p_token: token,
+      p_platform: Platform.OS,
+      p_enabled: true,
+    });
+    if (error) console.warn('[Notif] register_device_push_token error:', error.message);
 
     return token;
   } catch (err) {
@@ -247,10 +245,7 @@ export async function unregisterBcvPush(): Promise<void> {
   try {
     const token = await AsyncStorage.getItem(KEY_TOKEN);
     if (!token) return;
-    await supabase
-      .from('device_push_tokens')
-      .update({ enabled: false, updated_at: new Date().toISOString() })
-      .eq('token', token);
+    await supabase.rpc('disable_device_push_token', { p_token: token });
   } catch (err) {
     console.warn('[Notif] unregisterBcvPush error:', err);
   }

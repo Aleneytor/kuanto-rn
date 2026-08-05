@@ -1,13 +1,15 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.EXPO_PUBLIC_MOBILE_SUPABASE_URL;
+const supabasePublishableKey = process.env.EXPO_PUBLIC_MOBILE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+export const isMobileBackendConfigured = Boolean(supabaseUrl && supabasePublishableKey);
+
+if (!isMobileBackendConfigured) {
   console.warn(
-    '[Supabase] Faltan EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
-      'Copia .env.example a .env y rellena los valores.',
+    '[Supabase Mobile] Falta la configuración del backend móvil. ' +
+      'Copia .env.example a .env.local y agrega las credenciales públicas del proyecto nuevo.',
   );
 }
 
@@ -15,10 +17,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * Cliente Supabase (solo lectura pública, protegido por RLS).
  * Sin sesión/login: la app solo consulta tablas de tasas.
  */
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
+export const supabase = createClient(
+  supabaseUrl ?? 'https://mobile-backend-not-configured.invalid',
+  supabasePublishableKey ?? 'sb_publishable_mobile_backend_not_configured',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
   },
-});
+);

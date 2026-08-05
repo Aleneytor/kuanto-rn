@@ -3,5 +3,13 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["node_modules", "temp_kuanto_web"]
+  "exclude": [
+    "node_modules",
+    "temp_kuanto_web",
+    "android",
+    "android-sdk",
+    ".gradle_home",
+    ".eas-local-build",
+    "supabase/functions"
+  ]
 }

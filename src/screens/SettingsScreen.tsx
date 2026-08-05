@@ -15,8 +15,6 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as StoreReview from 'expo-store-review';
-import Constants from 'expo-constants';
 import {
   Bell,
   ChevronDown,
@@ -150,33 +148,23 @@ export function SettingsScreen({ onClose, onOpenHistory, onOpenSources }: Props)
     }
   };
 
-  const handleRateApp = async () => {
-    try {
-      // En Expo Go, la calificación integrada intentaría calificar a la app "Expo Go" en sí misma.
-      // Si estamos en Expo Go (storeClient), evitamos el diálogo nativo y forzamos la redirección
-      // directa a la Play Store para poder probar el enlace a la app de Kuanto.
-      const isExpoGo = Constants.executionEnvironment === 'storeClient';
-
-      if (!isExpoGo && await StoreReview.hasAction()) {
-        await StoreReview.requestReview();
-      } else {
-        const appId = 'com.aleneytor.app';
-        const url = Platform.select({
-          android: `market://details?id=${appId}`,
-          ios: `itms-apps://itunes.apple.com/app/idYOUR_APP_ID?action=write-review`,
-        });
-        if (url) {
-          Linking.openURL(url).catch(() => {
-            const webUrl = `https://play.google.com/store/apps/details?id=${appId}`;
-            Linking.openURL(webUrl).catch(() => {
-              Alert.alert('Error', 'No se pudo abrir la tienda de aplicaciones.');
-            });
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('[Settings] Error showing store review:', err);
-    }
+  const handleRateApp = () => {
+    // El botón manual siempre lleva directo a la ficha de la tienda: la API de
+    // reseña integrada (StoreReview) aplica una cuota interna no documentada
+    // que a menudo no muestra ningún diálogo, dejando el botón "sin reacción".
+    // Google recomienda no atar un CTA explícito a esa API por eso mismo.
+    const appId = 'com.aleneytor.app';
+    const url = Platform.select({
+      android: `market://details?id=${appId}`,
+      ios: `itms-apps://itunes.apple.com/app/idYOUR_APP_ID?action=write-review`,
+    });
+    const webUrl = `https://play.google.com/store/apps/details?id=${appId}`;
+    if (!url) return;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(webUrl).catch(() => {
+        Alert.alert('Error', 'No se pudo abrir la tienda de aplicaciones.');
+      });
+    });
   };
 
   const handleContactSupport = () => {

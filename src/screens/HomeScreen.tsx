@@ -32,6 +32,7 @@ import { type PaymentMethod } from '../constants/banks';
 import { CurrencyGap } from '../components/CurrencyGap';
 import { SettingsScreen } from './SettingsScreen';
 import { NotificationPrompt } from '../components/NotificationPrompt';
+import { AdBanner } from '../components/AdBanner';
 import {
   addNotificationTapHandler,
   requestPermissions,
@@ -439,6 +440,8 @@ export function HomeScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
+
+      <AdBanner bottomInset={insets.bottom} />
 
       <HeaderMenu
         visible={menuOpen}
